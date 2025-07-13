@@ -1,182 +1,132 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { signUp } from '../../services/authService';
 import { auth } from '../../firebase/firebase';
-import meeshoLogo from '../../assets/meeshoLogo.png';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { signInWithGoogle } from '../../services/authService';
+import rightImageSignup from '../../assets/right-image-signup.png';
+import Navbar from '../../components/Navbar';
+import Footer from '../../components/Footer';
 
 const SellerSignup = () => {
-  const [mobile, setMobile] = useState('');
-  const [otp, setOtp] = useState('');
-  const [step, setStep] = useState(1); // 1: enter mobile, 2: enter OTP
-  const [error, setError] = useState({ mobile: '', otp: '' });
-  const [confirmationResult, setConfirmationResult] = useState(null);
-  const [whatsapp, setWhatsapp] = useState(true);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState({ name: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const recaptchaRef = useRef(null);
+  const navigate = useNavigate();
 
-  // Initialize RecaptchaVerifier only once
-  useEffect(() => {
-    // Only run on client
-    if (typeof window === 'undefined') return;
-    // Only initialize once and if auth is defined
-    if (!window.recaptchaVerifier && auth) {
-      try {
-        window.recaptchaVerifier = new RecaptchaVerifier(
-          'recaptcha-container',
-          {
-            size: 'normal',
-            callback: () => {},
-          },
-          auth
-        );
-        window.recaptchaVerifier.render();
-      } catch (err) {
-        toast.error('Recaptcha initialization failed: ' + err.message);
-      }
-    }
-  }, [auth]);
-
-  const handleSendOtp = async (e) => {
+  const handleSignup = async (e) => {
     e.preventDefault();
-    setError({ mobile: '', otp: '' });
-    if (!mobile.match(/^\d{10}$/)) {
-      toast.error('Please enter a valid 10-digit mobile number.');
-      setError({ ...error, mobile: 'Please enter a valid 10-digit mobile number.' });
-      return;
+    let hasError = false;
+    let newError = { name: '', email: '', password: '' };
+    if (!name) {
+      newError.name = 'This field is required.';
+      hasError = true;
     }
+    if (!email) {
+      newError.email = 'This field is required.';
+      hasError = true;
+    }
+    if (!password) {
+      newError.password = 'This field is required.';
+      hasError = true;
+    }
+    setError(newError);
+    if (hasError) return;
     setLoading(true);
     try {
-      const appVerifier = window.recaptchaVerifier;
-      const confirmation = await signInWithPhoneNumber(auth, '+91' + mobile, appVerifier);
-      setConfirmationResult(confirmation);
-      setStep(2);
-      toast.success('OTP sent successfully!');
+      await signUp(email, password);
+      toast.success('Signup successful!');
+      navigate('/dashboard');
     } catch (err) {
       toast.error(err.message);
-      setError({ ...error, mobile: err.message });
+      setError({ ...newError, email: err.message });
     }
     setLoading(false);
   };
 
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    setError({ ...error, otp: '' });
-    if (!otp.match(/^\d{6}$/)) {
-      toast.error('Please enter a valid 6-digit OTP.');
-      setError({ ...error, otp: 'Please enter a valid 6-digit OTP.' });
-      return;
-    }
-    setLoading(true);
+  const handleGoogle = async () => {
     try {
-      await confirmationResult.confirm(otp);
-      setSuccess(true);
-      toast.success('Account Created!');
+      await signInWithGoogle();
+      navigate('/dashboard');
     } catch (err) {
-      toast.error('Invalid OTP. Please try again.');
-      setError({ ...error, otp: 'Invalid OTP. Please try again.' });
+      toast.error(err.message);
     }
-    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen flex bg-[#f8f7fa] font-sans" style={{ fontFamily: 'Mier book, sans-serif' }}>
+    <div className="min-h-screen bg-white font-sans flex flex-col">
       <ToastContainer position="top-center" autoClose={3000} />
-      {/* Left: Form */}
-      <div className="flex-1 flex flex-col justify-center px-12 py-8 bg-white max-w-xl">
-        <img src={meeshoLogo} alt="Meesho Logo" className="top-0 w-72 mb-8" />
-        <h1 className="text-2xl font-bold text-[#34313b] mb-1">Welcome to Meesho</h1>
-        <p className="text-base text-[#7a7a7a] mb-8">Create your account to start selling</p>
-        <form onSubmit={step === 1 ? handleSendOtp : handleVerifyOtp} className="space-y-4">
-          <div>
-            <label className="block mb-1 text-sm font-medium text-[#34313b]">Enter Mobile Number</label>
-            <div className="flex gap-2">
-              <input
-                type="tel"
-                maxLength={10}
-                className={`flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:border-[#9B177E] transition text-base ${error.mobile ? 'border-[#e53935] bg-[#fff6f6]' : 'border-[#d3d3d3] bg-white'}`}
-                value={mobile}
-                onChange={e => { setMobile(e.target.value.replace(/\D/g, '')); setError({ ...error, mobile: '' }); }}
-                disabled={step === 2}
-                placeholder="Enter Mobile Number"
-              />
-              <button
-                type="submit"
-                className="px-4 py-2 rounded-lg bg-[#e5e5e5] text-[#7a7a7a] font-semibold"
-                disabled={step === 2 || loading || !mobile.match(/^\d{10}$/)}
-                style={{ minWidth: 100 }}
-              >
-                {step === 1 ? 'Send OTP' : 'Sent'}
-              </button>
-            </div>
-            {error.mobile && <span className="text-xs text-[#e53935] mt-1 block">{error.mobile}</span>}
-          </div>
-          {step === 2 && (
+      <Navbar />
+      <div className="flex flex-1">
+        {/* Left: Form */}
+        <div className="flex-1 flex flex-col justify-start px-12 py-8 bg-white max-w-xl">
+          <h1 className="text-4xl font-extrabold text-[#34313b] mb-2 mt-4">Welcome to Meesho</h1>
+          <p className="text-base text-[#7a7a7a] mb-8">Create your account to start selling</p>
+          <form onSubmit={handleSignup} className="space-y-4">
             <div>
-              <label className="block mb-1 text-sm font-medium text-[#34313b]">Enter OTP</label>
+              <label className="block mb-1 text-sm font-medium text-[#34313b]">Name</label>
               <input
                 type="text"
-                maxLength={6}
-                className={`w-full border rounded-lg px-4 py-2 focus:outline-none focus:border-[#9B177E] transition text-base ${error.otp ? 'border-[#e53935] bg-[#fff6f6]' : 'border-[#d3d3d3] bg-white'}`}
-                value={otp}
-                onChange={e => { setOtp(e.target.value.replace(/\D/g, '')); setError({ ...error, otp: '' }); }}
-                placeholder="Enter OTP"
+                className={`w-full border rounded-lg px-4 py-2 focus:outline-none focus:border-[#9B177E] transition text-base ${error.name ? 'border-[#e53935] bg-[#fff6f6]' : 'border-[#d3d3d3] bg-white'}`}
+                value={name}
+                onChange={e => { setName(e.target.value); setError({ ...error, name: '' }); }}
+                placeholder="Enter your name"
               />
-              {error.otp && <span className="text-xs text-[#e53935] mt-1 block">{error.otp}</span>}
+              {error.name && <span className="text-xs text-[#e53935] mt-1 block">{error.name}</span>}
             </div>
-          )}
-          <div className="flex items-center mt-2">
-            <input
-              type="checkbox"
-              checked={whatsapp}
-              onChange={e => setWhatsapp(e.target.checked)}
-              className="accent-[#25d366] mr-2"
-              id="whatsapp"
-            />
-            <label htmlFor="whatsapp" className="text-sm text-[#34313b]">I want to receive important updates on <span className="font-semibold text-[#25d366]">WhatsApp</span></label>
+            <div>
+              <label className="block mb-1 text-sm font-medium text-[#34313b]">Email</label>
+              <input
+                type="email"
+                className={`w-full border rounded-lg px-4 py-2 focus:outline-none focus:border-[#9B177E] transition text-base ${error.email ? 'border-[#e53935] bg-[#fff6f6]' : 'border-[#d3d3d3] bg-white'}`}
+                value={email}
+                onChange={e => { setEmail(e.target.value); setError({ ...error, email: '' }); }}
+                placeholder="Enter your email"
+              />
+              {error.email && <span className="text-xs text-[#e53935] mt-1 block">{error.email}</span>}
+            </div>
+            <div>
+              <label className="block mb-1 text-sm font-medium text-[#34313b]">Password</label>
+              <input
+                type="password"
+                className={`w-full border rounded-lg px-4 py-2 focus:outline-none focus:border-[#9B177E] transition text-base ${error.password ? 'border-[#e53935] bg-[#fff6f6]' : 'border-[#d3d3d3] bg-white'}`}
+                value={password}
+                onChange={e => { setPassword(e.target.value); setError({ ...error, password: '' }); }}
+                placeholder="Enter your password"
+              />
+              {error.password && <span className="text-xs text-[#e53935] mt-1 block">{error.password}</span>}
+            </div>
+            <button
+              type="submit"
+              className="w-full p-3 rounded-lg mt-4 text-white font-semibold text-base"
+              style={{ background: loading ? '#e5e5e5' : '#9B177E', cursor: loading ? 'not-allowed' : 'pointer' }}
+              disabled={loading}
+            >
+              Create Account
+            </button>
+          </form>
+          <div className="flex items-center my-6">
+            <div className="flex-grow h-px bg-gray-200" />
+            <span className="mx-2 text-gray-400 text-sm">Or Continue With</span>
+            <div className="flex-grow h-px bg-gray-200" />
           </div>
-          <button
-            type="button"
-            className="w-full p-3 rounded-lg mt-4 text-white font-semibold text-base"
-            style={{ background: step === 2 && otp.length === 6 && !loading ? '#9B177E' : '#e5e5e5', cursor: (step === 2 && otp.length === 6 && !loading) ? 'pointer' : 'not-allowed' }}
-            disabled={!(step === 2 && otp.length === 6 && !loading) || success}
-            onClick={handleVerifyOtp}
-          >
-            {success ? 'Account Created!' : 'Create Account'}
-          </button>
-          <div id="recaptcha-container" ref={recaptchaRef} className="mt-2" />
-        </form>
-        <p className="text-xs text-[#7a7a7a] mt-4">By clicking you agree to our <a href="#" className="text-[#9B177E] underline">Terms & Conditions</a> and <a href="#" className="text-[#9B177E] underline">Privacy Policy</a></p>
-      </div>
-      {/* Right: Info/Checklist */}
-      <div className="flex-1 flex flex-col px-12 py-8 bg-[#f8f7fa] border-l border-[#ececec] min-w-[350px]">
-        {/* Top: Logo and Login */}
-        <div className="items-center mb-8 w-full">
-          <div className="justify-end items-center">
-            <span className="text-sm text-[#7a7a7a] mr-2">Already a user?</span>
-            <a href="/" className="text-center bg-[#9B177E] px-6 py-2 border-2 text-white rounded-lg font-bold text-base hover:bg-[#fbe9f2] transition-all" style={{ minWidth: 120, fontSize: '1.1rem' }}>Log in</a>
+          <div className="flex flex-col items-center gap-4 mb-4">
+            <button type="button" onClick={handleGoogle} className="bg-white border border-gray-200 rounded-full p-2 shadow hover:shadow-md transition"><img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-6 h-6" /></button>
+            <div className="text-center text-sm mt-2">
+              Already a user?{' '}
+              <button className="text-[#35063e] font-semibold hover:underline" onClick={() => navigate('/')}>Log in</button>
+            </div>
           </div>
         </div>
-        <div className="mb-8">
-          <h2 className="text-lg font-bold text-[#34313b] mb-2">Grow your business faster by selling on Meesho</h2>
-          <ul className="text-[#34313b] text-base mb-4 space-y-2">
-            <li><span className="font-bold">11 lakh+</span> Suppliers are selling commission-free</li>
-            <li><span className="font-bold">19000+</span> Pincodes supported for delivery</li>
-            <li><span className="font-bold">Crore of</span> Customers buy across India</li>
-            <li><span className="font-bold">700 +</span> Categories to sell</li>
-          </ul>
-        </div>
-        <div>
-          <h3 className="text-base font-bold text-[#34313b] mb-2">All you need to sell on Meesho is:</h3>
-          <ul className="text-[#34313b] text-base space-y-2">
-            <li><span className="inline-block w-4 h-4 bg-[#9B177E] rounded-full mr-2 align-middle"></span>Tax Details</li>
-            <li><span className="inline-block w-4 h-4 bg-[#9B177E] rounded-full mr-2 align-middle"></span>Enrolment ID/UIN <span className="ml-2 px-2 py-0.5 bg-[#fbe9f2] text-[#9B177E] rounded text-xs">For Non-GST sellers</span> <span className="ml-1 px-2 py-0.5 bg-[#ffebee] text-[#e53935] rounded text-xs">New!</span></li>
-            <li><span className="inline-block w-4 h-4 bg-[#9B177E] rounded-full mr-2 align-middle"></span>GSTIN <span className="ml-2 px-2 py-0.5 bg-[#ececec] text-[#34313b] rounded text-xs">Regular & Composition GST sellers</span></li>
-            <li><span className="inline-block w-4 h-4 bg-[#9B177E] rounded-full mr-2 align-middle"></span>Bank Account</li>
-          </ul>
+        {/* Right: Illustration */}
+        <div className="flex-1 flex items-center justify-center px-0 py-0 bg-[#f8f7fa] border-l border-[#ececec] min-w-[350px] h-full">
+          <img src={rightImageSignup} alt="Signup Illustration" className="w-full h-full object-cover" />
         </div>
       </div>
+      <Footer />
     </div>
   );
 };
