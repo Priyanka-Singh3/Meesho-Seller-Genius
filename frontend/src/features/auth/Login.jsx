@@ -8,9 +8,10 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
-  const [user, loading] = useAuthState(auth);
+  const [user, loadingAuth] = useAuthState(auth);
+  const [loading, setLoading] = useState(false);
 
-  if (loading) return <p>Loading...</p>;
+  if (loadingAuth) return <p>Loading...</p>;
   if (user) {
     navigate('/dashboard');
     return null;
@@ -18,16 +19,18 @@ const Login = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
       navigate('/dashboard');
     } catch (error) {
       alert(error.message);
     }
+    setLoading(false);
   };
 
   return (
-    <form onSubmit={handleLogin} className="bg-white p-8 rounded-xl shadow-lg" style={{ fontFamily: 'Mier book, sans-serif' }}>
+    <form onSubmit={handleLogin} className="bg-white p-8 rounded-xl shadow-lg">
       <h2 className="text-2xl mb-4 font-semibold">Login</h2>
       <input
         type="email"
@@ -43,8 +46,22 @@ const Login = () => {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
       />
-      <button type="submit" className="w-full px-4 py-2 rounded" style={{ background: '#9B177E', color: '#fff', fontFamily: 'Mier book, sans-serif' }}>
-        Login
+      <button
+        type="submit"
+        className={`w-full px-4 py-2 rounded transition font-semibold flex items-center justify-center
+          ${loading ? 'bg-[#e5e5e5] cursor-not-allowed' : 'bg-[#9B177E] hover:bg-[#7a125f] active:bg-[#5c0e47]'}
+          text-white relative`}
+        style={{ fontFamily: 'Outfit, Arial, sans-serif' }}
+        disabled={loading}
+      >
+        {loading ? (
+          <span className="flex items-center">
+            <span className="animate-spin rounded-full h-5 w-5 border-2 border-t-2 border-white border-t-[#9B177E] mr-2"></span>
+            Logging in...
+          </span>
+        ) : (
+          'Login'
+        )}
       </button>
     </form>
   );

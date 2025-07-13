@@ -7,6 +7,9 @@ import ProtectedRoute from './features/auth/ProtectedRoute';
 import Dashboard from './features/dashboard/Dashboard';
 import AuthPage from './features/auth/AuthPage';
 import SellerSignup from './features/auth/SellerSignup';
+import BulkListing from './features/dashboard/BulkListing';
+import DynamicPricing from './features/dashboard/DynamicPricing';
+import SocialMediaPost from './features/dashboard/SocialMediaPost';
 
 function App() {
   
@@ -24,6 +27,9 @@ function App() {
           }
         />
         <Route path="/seller-signup" element={<SellerSignup />} />
+        <Route path="/bulk-listing" element={<ProtectedRoute><BulkListing /></ProtectedRoute>} />
+        <Route path="/dynamic-pricing" element={<ProtectedRoute><DynamicPricing /></ProtectedRoute>} />
+        <Route path="/social-media-post" element={<ProtectedRoute><SocialMediaPost /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   );
