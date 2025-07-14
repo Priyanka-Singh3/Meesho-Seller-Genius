@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview"
   },
+  
   "dependencies": {
     "@tailwindcss/vite": "^4.1.11",
     "firebase": "^11.10.0",
@@ -16,7 +17,12 @@
     "react-dom": "^19.1.0",
     "react-firebase-hooks": "^5.1.1",
     "react-router-dom": "^7.6.3",
-    "tailwindcss": "^4.1.11"
+    "react-toastify": "^11.0.5",
+  "@vishalvoid/react-india-map": "^2.0.0",
+  "react-simple-maps": "^3.0.0",
+  "chart.js": "^4.4.0",
+  "react-chartjs-2": "^5.2.0",
+  "framer-motion": "^10.16.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
