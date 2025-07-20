@@ -17,10 +17,7 @@ An AI-powered seller platform inspired by Meesho, built as a group project. Empo
 - **Dynamic Pricing**
   - AI-driven price suggestions based on demand, region, and festival data.
   - Visual tools for adjusting and applying price changes.
-    <img width="916" height="486" alt="image" src="https://github.com/user-attachments/assets/d2f5103c-a6e6-47fe-90da-e25827a98b46" />
-    <img width="341" height="457" alt="image" src="https://github.com/user-attachments/assets/5ebb2fef-417f-4cfd-8362-09630b29c498" />
-    <img width="407" height="285" alt="image" src="https://github.com/user-attachments/assets/a9a66be3-bf7f-4cce-bfbb-d3c0e0bec86a" />
-    <img width="398" height="283" alt="image" src="https://github.com/user-attachments/assets/29fcd416-2365-4856-80aa-3d0a56025070" />
+
 
 
 
@@ -96,7 +93,11 @@ and translate to Hindi, the preview will show:
 
 
 ### Dynamic Pricing
-
+    <img width="916" height="486" alt="image" src="https://github.com/user-attachments/assets/d2f5103c-a6e6-47fe-90da-e25827a98b46" />
+    <img width="341" height="457" alt="image" src="https://github.com/user-attachments/assets/5ebb2fef-417f-4cfd-8362-09630b29c498" />
+    <img width="407" height="285" alt="image" src="https://github.com/user-attachments/assets/a9a66be3-bf7f-4cce-bfbb-d3c0e0bec86a" />
+    <img width="398" height="283" alt="image" src="https://github.com/user-attachments/assets/29fcd416-2365-4856-80aa-3d0a56025070" />
+    
 
 ---
 
