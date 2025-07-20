@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 3000;
 console.log('Starting backend server...');
 
 const corsOptions = {
-  origin: 'http://localhost:5173',
+  origin: 'https://meesho-eight.vercel.app',
   credentials: true,
 };
 app.use(cors(corsOptions));
