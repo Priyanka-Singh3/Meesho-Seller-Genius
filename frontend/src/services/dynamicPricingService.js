@@ -5,28 +5,28 @@ export const fetchProductList = async () => {
       id: '1',
       name: "Women's Ethnic Dress",
       price: 599,
-      image: 'https://images.meesho.com/images/products/12345678/abcde_512.jpg',
+      image: 'https://images.meesho.com/images/products/373551605/mw753_512.avif?width=512',
       category: 'Fashion'
     },
     {
       id: '2',
       name: "Men's Casual Shirt",
       price: 399,
-      image: 'https://images.meesho.com/images/products/87654321/fghij_512.jpg',
+      image: 'https://images.meesho.com/images/products/552015067/2lf7n_512.avif?width=512',
       category: 'Fashion'
     },
     {
       id: '3',
       name: 'Kitchen Storage Set',
       price: 799,
-      image: 'https://images.meesho.com/images/products/13579246/klmno_512.jpg',
+      image: 'https://images.meesho.com/images/products/450613193/s5ksl_512.avif?width=512',
       category: 'Home'
     },
     {
       id: '4',
       name: 'Wireless Headphones',
       price: 1299,
-      image: 'https://images.meesho.com/images/products/24681357/pqrst_512.jpg',
+      image: 'https://images.meesho.com/images/products/568203575/4q3sx_512.avif?width=512',
       category: 'Electronics'
     }
   ];
