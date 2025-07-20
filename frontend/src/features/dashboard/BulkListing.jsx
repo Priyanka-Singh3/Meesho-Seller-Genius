@@ -83,7 +83,7 @@ export default function CSVProductUploadForm() {
       formData.append('image', imageBlob, 'image.png');
       formData.append('bg_color', bgColor);
 
-      const backendResponse = await fetch('http://localhost:3000/remove-background', {
+      const backendResponse = await fetch('https://meesho-seller-genius.onrender.com/remove-background', {
         method: 'POST',
         body: formData,
       });
@@ -189,7 +189,7 @@ export default function CSVProductUploadForm() {
         csvRowData: item // Send the entire CSV row data
       };
 
-      const response = await fetch('http://localhost:3000/generate-copy', {
+      const response = await fetch('https://meesho-seller-genius.onrender.com/generate-copy', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
