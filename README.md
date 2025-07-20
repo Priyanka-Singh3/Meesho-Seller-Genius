@@ -57,18 +57,39 @@ and translate to Hindi, the preview will show:
 
 ## 📸 Screenshots
 
-<!-- Replace these with your actual screenshots -->
+### Login / Signup
+<img width="1276" height="714" alt="image" src="https://github.com/user-attachments/assets/9c2e8fee-72fa-4a09-a5db-bdf9834c7a73" />
+
+<img width="1263" height="712" alt="image" src="https://github.com/user-attachments/assets/2554ae4d-3f9c-43d4-85b8-83a2eb66db04" />
+
+
 ### Dashboard
-![Dashboard Screenshot](screenshots/dashboard.png)
+<img width="1278" height="716" alt="image" src="https://github.com/user-attachments/assets/6d7348be-b582-4730-8e8b-12a461471ef8" />
 
 ### Social Media Post Generator
-![Social Media Post Screenshot](screenshots/social-post.png)
+
+<img width="1279" height="706" alt="image" src="https://github.com/user-attachments/assets/f95e6c95-9e58-4268-b39d-65806a26a739" />
+
+#### Enhance the caption and description
+
+<img width="1257" height="743" alt="image" src="https://github.com/user-attachments/assets/cf51cc2a-75f8-4773-8472-f4ae64b2039a" />
+
+
+#### Can select languages for your post
+
+
+<img width="1151" height="455" alt="image" src="https://github.com/user-attachments/assets/999b17dc-0884-44b0-be53-715eba741608" />
+
+
+
+
 
 ### Bulk Listing
-![Bulk Listing Screenshot](screenshots/bulk-listing.png)
+
+
 
 ### Dynamic Pricing
-![Dynamic Pricing Screenshot](screenshots/dynamic-pricing.png)
+
 
 ---
 
@@ -155,6 +176,107 @@ Contributions, issues, and feature requests are welcome!
 
 ---
 
-## 📄 License
+## 📚 Open Source Libraries & Tools Used
+
+This project leverages the following open-source libraries and tools across the backend, frontend, and AI/ML components:
+
+---
+
+### 🖥️ Backend (Node.js / Express)
+
+- **[Express](https://expressjs.com/)** (v5.1.0, MIT License)  
+  Web server framework for handling HTTP requests and routing.
+
+- **[CORS](https://www.npmjs.com/package/cors)** (v2.8.5, MIT License)  
+  Middleware to enable Cross-Origin Resource Sharing.
+
+- **[dotenv](https://www.npmjs.com/package/dotenv)** (v16.6.1, MIT License)  
+  Loads environment variables from `.env` files.
+
+- **[Axios](https://axios-http.com/)** (v1.10.0, MIT License)  
+  Promise-based HTTP client for making API requests.
+
+- **[Multer](https://github.com/expressjs/multer)** (v1.4.5-lts.1, MIT License)  
+  Handles `multipart/form-data` for file uploads (used in-memory only).
+
+- **[Cloudinary](https://cloudinary.com/)** (v1.41.3, MIT License)  
+  Upload and store images directly to Cloudinary cloud storage.
+
+- **[Streamifier](https://www.npmjs.com/package/streamifier)** (v0.1.1, MIT License)  
+  Converts buffers into readable streams (used for uploading to Cloudinary).
+
+- **[OpenAI Node](https://github.com/openai/openai-node)** (v5.9.2, MIT License) *(optional)*  
+  SDK for interacting with OpenAI APIs.
+
+- **[Path](https://nodejs.org/api/path.html)** (v0.12.7, MIT License)  
+  Node.js module for handling file and directory paths.
+
+- **[Sharp](https://sharp.pixelplumbing.com/)** (v0.34.3, Apache-2.0 License) *(optional)*  
+  High-performance image processing and resizing.
+
+---
+
+### 💻 Frontend (React)
+
+- **[React](https://reactjs.org/)** (v18.x, MIT License)  
+  Declarative JavaScript library for building user interfaces.
+
+- **[React DOM](https://reactjs.org/docs/react-dom.html)** (v18.x, MIT License)  
+  Handles rendering of React components in the DOM.
+
+- **[React Toastify](https://fkhadra.github.io/react-toastify/)** (v9.x, MIT License)  
+  Simple and customizable toast notifications.
+
+- **[@headlessui/react](https://headlessui.com/react)** (v1.x, MIT License)  
+  Unstyled, accessible UI components for React.
+
+- **[Vite](https://vitejs.dev/)** (v4.x, MIT License)  
+  Fast and modern build tool for frontend development.
+
+> ℹ️ *Note: Additional libraries (e.g., for charting, animations, or mapping) may be used in feature-specific files. Please refer to your `package.json` for a full list of dependencies.*
+
+---
+
+### 🧠 Python Libraries (AI/ML & Image Processing)
+
+- **[transformers](https://huggingface.co/docs/transformers)** (>=4.30.0, Apache-2.0 License)  
+  Access to state-of-the-art NLP models from HuggingFace.
+
+- **[torch](https://pytorch.org/)** (>=2.0.0, BSD-3-Clause License)  
+  Core deep learning library for model inference.
+
+- **[torchvision](https://pytorch.org/vision/stable/index.html)** (>=0.15.0, BSD-3-Clause License)  
+  Utilities for computer vision and image datasets.
+
+- **[Pillow](https://python-pillow.org/)** (>=9.0.0, HPND License)  
+  Python Imaging Library for basic image processing.
+
+- **[scikit-image](https://scikit-image.org/)** (>=0.20.0, BSD-3-Clause License)  
+  Advanced image processing utilities built on NumPy and SciPy.
+
+- **[huggingface-hub](https://huggingface.co/docs/huggingface_hub)** (>=0.16.0, Apache-2.0 License)  
+  Interface for downloading and uploading models to HuggingFace.
+
+- **[numpy](https://numpy.org/)** (>=1.21.0, BSD-3-Clause License)  
+  Fundamental package for numerical computation.
+
+- **[requests](https://docs.python-requests.org/en/latest/)** (>=2.25.0, Apache-2.0 License)  
+  Simplified HTTP requests for APIs.
+
+- **[tqdm](https://tqdm.github.io/)** (>=4.64.0, MPL-2.0 License)  
+  Command-line progress bars for loops and tasks.
+
+- **[accelerate](https://huggingface.co/docs/accelerate/index)** (>=0.20.0, Apache-2.0 License)  
+  Performance-optimized tools for training and inference on any device.
+
+- **[google-generativeai](https://pypi.org/project/google-generativeai/)** (==0.4.1, Apache-2.0 License)  
+  Google’s Python client for accessing Generative AI APIs.
+
+---
+
+All libraries are used as direct dependencies and **have not been modified**.  
+For full details, refer to each library’s official documentation and licensing terms.
+
+
 
 [MIT](LICENSE)
