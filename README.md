@@ -89,6 +89,41 @@ and translate to Hindi, the preview will show:
 
 
 ### Bulk Listing
+### Bulk Listing
+#### Processing product images - removing background and choosing the preffered color for the background
+<img width="1502" height="879" alt="image" src="https://github.com/user-attachments/assets/38588176-0916-43e7-9da1-9b411b817b77" />
+
+#### Choosing color for a particular product
+<img width="229" height="311" alt="image" src="https://github.com/user-attachments/assets/001587ad-62fe-4ce6-b7a2-229262d132fb" />
+
+#### To (with option to revert back to orignal image)
+<img width="636" height="684" alt="image" src="https://github.com/user-attachments/assets/9b96e179-c8bd-4849-8332-33a0025c0195" />
+
+#### Can also choose a global color for all the product images to give them same background
+<img width="1414" height="241" alt="image" src="https://github.com/user-attachments/assets/b7dd06b6-632a-4acb-9747-86d32a7b873e" />
+
+<img width="1432" height="905" alt="image" src="https://github.com/user-attachments/assets/ddcc9e45-0033-4453-99cd-ab37894fc042" />
+
+
+
+#### AI Generation of content - titles, market tagline, descriptions, seo keywords, features and hashtags
+<img width="1476" height="822" alt="image" src="https://github.com/user-attachments/assets/09696786-be0b-47c1-bcad-1e856b53ec70" />
+
+<img width="486" height="155" alt="image" src="https://github.com/user-attachments/assets/0ebe10b7-90e1-414f-a169-1582cd5cf72b" />
+
+<img width="489" height="153" alt="image" src="https://github.com/user-attachments/assets/c8d5025c-9dfa-498f-b496-74fa2b5f2ae0" />
+
+<img width="503" height="251" alt="image" src="https://github.com/user-attachments/assets/0a84c0c7-9e79-46df-a4b1-044aac85e6f3" />
+
+<img width="480" height="204" alt="image" src="https://github.com/user-attachments/assets/2f175723-4c2c-45ff-ad0e-b7d5de59c30a" />
+
+<img width="481" height="233" alt="image" src="https://github.com/user-attachments/assets/9717a642-4575-4452-8ad1-855c5cb4ac26" />
+
+<img width="482" height="246" alt="image" src="https://github.com/user-attachments/assets/ae71461d-3f28-4c9a-bf2a-8086b23c2dff" />
+
+#### After the image processing and content generation the product list can be finally uploaded
+<img width="1581" height="892" alt="image" src="https://github.com/user-attachments/assets/b147b2c9-3f52-4738-b33c-3d40f7e1aeb0" />
+
 
 
 
