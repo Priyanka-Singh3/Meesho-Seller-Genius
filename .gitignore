@@ -18,6 +18,7 @@ backend/__pycache__/
 backend/env/
 backend/venv/
 backend/.env
+backend/python/.env
 
 # MacOS system files
 .DS_Store
