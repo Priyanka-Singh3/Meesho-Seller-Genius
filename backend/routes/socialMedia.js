@@ -1,18 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const upload = require('../storage/imageStorage');
+const { upload, cloudinaryUploadMiddleware } = require('../storage/imageStorage');
 const { enhanceDescription, generateCatchyCaption, translateDescription, translateCaption } = require('../services/aiService');
 
 // POST /api/social-media/generate
-router.post('/generate', upload.single('image'), async (req, res) => {
+router.post('/generate', upload.single('image'), cloudinaryUploadMiddleware, async (req, res) => {
   try {
     const { title, description, language } = req.body;
-    const image = req.file;
-    if (!title || !description || !image) {
+    if (!title || !description || !req.fileUrl) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     // 1. Store image and get URL
-    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${image.filename}`;
+    const imageUrl = req.fileUrl;
 
     // 2. Enhance description using LLM (always in English)
     const improvedDescription = await enhanceDescription(description);
