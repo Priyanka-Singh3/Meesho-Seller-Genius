@@ -124,7 +124,7 @@ cd ../frontend
 npm start
 ```
 
-The app will be available at `http://localhost:3000` (backend) and `http://localhost:5173` (frontend, or as per your Vite config).
+The app will be available at `https://meesho-seller-genius.onrender.com` (backend) and `http://localhost:5173` (frontend, or as per your Vite config).
 
 ---
 
