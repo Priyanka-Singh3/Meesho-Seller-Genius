@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signUp } from '../../services/authService';
-import { auth } from '../../firebase/firebase';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { signInWithGoogle } from '../../services/authService';
@@ -60,12 +59,12 @@ const SellerSignup = () => {
     <div className="min-h-screen bg-white font-sans flex flex-col">
       <ToastContainer position="top-center" autoClose={3000} />
       <Navbar />
-      <div className="flex flex-1">
+      <div className="flex flex-grow min-h-[calc(100vh-110px)]">
         {/* Left: Form */}
-        <div className="flex-1 flex flex-col justify-start px-12 py-8 bg-white max-w-xl">
+        <div className="flex flex-col justify-center items-start w-full max-w-xl px-12 py-8 bg-white">
           <h1 className="text-4xl font-extrabold text-[#34313b] mb-2 mt-4">Welcome to Meesho</h1>
           <p className="text-base text-[#7a7a7a] mb-8">Create your account to start selling</p>
-          <form onSubmit={handleSignup} className="space-y-4">
+          <form onSubmit={handleSignup} className="space-y-4 w-full">
             <div>
               <label className="block mb-1 text-sm font-medium text-[#34313b]">Name</label>
               <input
@@ -74,6 +73,7 @@ const SellerSignup = () => {
                 value={name}
                 onChange={e => { setName(e.target.value); setError({ ...error, name: '' }); }}
                 placeholder="Enter your name"
+                autoComplete="off"
               />
               {error.name && <span className="text-xs text-[#e53935] mt-1 block">{error.name}</span>}
             </div>
@@ -85,6 +85,7 @@ const SellerSignup = () => {
                 value={email}
                 onChange={e => { setEmail(e.target.value); setError({ ...error, email: '' }); }}
                 placeholder="Enter your email"
+                autoComplete="off"
               />
               {error.email && <span className="text-xs text-[#e53935] mt-1 block">{error.email}</span>}
             </div>
@@ -101,20 +102,22 @@ const SellerSignup = () => {
             </div>
             <button
               type="submit"
-              className="w-full p-3 rounded-lg mt-4 text-white font-semibold text-base"
+              className="w-full p-3 rounded-lg mt-4 text-white font-semibold text-base transition"
               style={{ background: loading ? '#e5e5e5' : '#9B177E', cursor: loading ? 'not-allowed' : 'pointer' }}
               disabled={loading}
             >
               Create Account
             </button>
           </form>
-          <div className="flex items-center my-6">
+          <div className="flex items-center my-6 w-full">
             <div className="flex-grow h-px bg-gray-200" />
             <span className="mx-2 text-gray-400 text-sm">Or Continue With</span>
             <div className="flex-grow h-px bg-gray-200" />
           </div>
-          <div className="flex flex-col items-center gap-4 mb-4">
-            <button type="button" onClick={handleGoogle} className="bg-white border border-gray-200 rounded-full p-2 shadow hover:shadow-md transition"><img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-6 h-6" /></button>
+          <div className="flex flex-col items-center gap-4 mb-4 w-full">
+            <button type="button" onClick={handleGoogle} className="bg-white border border-gray-200 rounded-full p-2 shadow hover:shadow-md transition">
+              <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-6 h-6" />
+            </button>
             <div className="text-center text-sm mt-2">
               Already a user?{' '}
               <button className="text-[#35063e] font-semibold hover:underline" onClick={() => navigate('/')}>Log in</button>
@@ -122,8 +125,15 @@ const SellerSignup = () => {
           </div>
         </div>
         {/* Right: Illustration */}
-        <div className="flex-1 flex items-center justify-center px-0 py-0 bg-[#f8f7fa] border-l border-[#ececec] min-w-[350px] h-full">
-          <img src={rightImageSignup} alt="Signup Illustration" className="w-full h-full object-cover" />
+        <div className="hidden md:flex flex-1 items-center justify-center bg-[#f8f7fa] border-l border-[#ececec] min-w-[340px] min-h-[540px] h-full">
+          <div className="flex items-center justify-center w-full h-full p-8 max-w-xl">
+            <img
+              src={rightImageSignup}
+              alt="Signup Illustration"
+              className="max-w-[400px] max-h-[500px] w-full h-auto object-contain rounded"
+              style={{ boxShadow: '0 2px 12px #e6e0eb' }}
+            />
+          </div>
         </div>
       </div>
       <Footer />
@@ -131,4 +141,4 @@ const SellerSignup = () => {
   );
 };
 
-export default SellerSignup; 
+export default SellerSignup;
