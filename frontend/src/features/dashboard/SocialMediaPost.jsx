@@ -15,8 +15,13 @@ import CollageLayoutSelector from '../../components/social-media/CollageLayoutSe
 import TextAreaWithAI from '../../components/social-media/TextAreaWithAI';
 import LanguageSelector from '../../components/social-media/LanguageSelector';
 import FormActions from '../../components/social-media/FormActions';
+// Remove: import Modal from '../../components/social-media/CustomPromptPopover';
 
-const API_URL = 'https://meesho-seller-genius.onrender.com/api/social-media/generate';
+// const API_URL = 'http://meesho-seller-genius.onrender.com/api/social-media/generate';
+
+// const API_URL = 'http://localhost:5050/api/social-media/generate';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_URL = `${API_BASE_URL}/api/social-media/generate`;
 
 const LANGUAGES = [
   { code: 'en', name: 'English' },
@@ -60,6 +65,8 @@ const SocialMediaPost = () => {
   const customDescPromptRef = useRef(null);
   const customCaptionPromptRef = useRef(null);
   const [customPromptLoading, setCustomPromptLoading] = useState(false);
+  const [showInstagramModal, setShowInstagramModal] = useState(false);
+  const [instagramId, setInstagramId] = useState(localStorage.getItem('instagramId') || '');
 
   // Auto-hide error after 2 seconds
   useEffect(() => {
@@ -128,7 +135,7 @@ const SocialMediaPost = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setLoading(true);
     setError(null);
     setCaptions(null);
@@ -145,6 +152,7 @@ const SocialMediaPost = () => {
       const response = await fetch(API_URL, {
         method: 'POST',
         body: formData,
+        credentials: 'include',
       });
       if (!response.ok) {
         throw new Error('Failed to generate caption');
@@ -166,10 +174,11 @@ const SocialMediaPost = () => {
     if (!captions || !description) return;
     setRefiningDescription(true);
     try {
-      const response = await fetch('https://meesho-seller-genius.onrender.com/api/social-media/refine-description', {
+      const response = await fetch(`${API_BASE_URL}/api/social-media/refine-description`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description }),
+        credentials: 'include',
       });
       if (!response.ok) throw new Error('Failed to refine description');
       const data = await response.json();
@@ -189,6 +198,22 @@ const SocialMediaPost = () => {
     navigator.clipboard.writeText(text);
     toast.success('Copied to clipboard!');
   };
+
+  const handlePublish = () => {
+    if (!instagramId) {
+      setShowInstagramModal(true);
+    } else {
+      toast.info('Automated Instagram posting coming soon! For now, copy your caption and post manually.');
+    }
+  };
+
+  // Add this useEffect to auto-trigger post generation on language change
+  useEffect(() => {
+    if (isFormValid) {
+      handleSubmit();
+    }
+    // eslint-disable-next-line
+  }, [selectedLanguage]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#f8e6f8] to-[#f8f2fa]">
@@ -225,14 +250,16 @@ const SocialMediaPost = () => {
                 if (!title || !description) return;
                 setRefiningInputCaption(true);
                 try {
-                  const response = await fetch('https://meesho-seller-genius.onrender.com/api/social-media/refine-caption', {
+                  const response = await fetch(`${API_BASE_URL}/api/social-media/refine-caption`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ caption: title, description }),
+                    credentials: 'include',
                   });
                   if (!response.ok) throw new Error('Failed to refine caption');
                   const data = await response.json();
                   setTitle(data.refinedCaption);
+                  setTimeout(() => handleSubmit(), 0); // Auto-generate post
                 } catch (err) {
                   toast.error(err.message || 'Failed to refine caption');
                 } finally {
@@ -242,15 +269,17 @@ const SocialMediaPost = () => {
               onCustomPrompt={async (customPrompt) => {
                 setCustomPromptLoading(true);
                 try {
-                  const response = await fetch('https://meesho-seller-genius.onrender.com/api/social-media/custom-ai', {
+                  const response = await fetch(`${API_BASE_URL}/api/social-media/custom-ai`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text: title, customPrompt }),
+                    credentials: 'include',
                   });
                   if (!response.ok) throw new Error('Failed to run custom AI prompt');
                   const data = await response.json();
                   setTitle(data.result);
                   setShowCustomCaptionPrompt(false);
+                  setTimeout(() => handleSubmit(), 0); // Auto-generate post
                 } catch (err) {
                   toast.error(err.message || 'Failed to run custom AI prompt');
                 } finally {
@@ -274,15 +303,17 @@ const SocialMediaPost = () => {
                 if (!description) return;
                 setRefiningInputDescription(true);
                 try {
-                  const response = await fetch('https://meesho-seller-genius.onrender.com/api/social-media/refine-description', {
+                  const response = await fetch(`${API_BASE_URL}/api/social-media/refine-description`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ description }),
+                    credentials: 'include',
                   });
                   if (!response.ok) throw new Error('Failed to refine description');
                   const data = await response.json();
                   setDescription(data.refinedDescription);
                   setCaptions(prev => prev ? { ...prev, improvedDescription: data.refinedDescription } : prev);
+                  setTimeout(() => handleSubmit(), 0); // Auto-generate post
                 } catch (err) {
                   toast.error(err.message || 'Failed to refine description');
                 } finally {
@@ -292,15 +323,17 @@ const SocialMediaPost = () => {
               onCustomPrompt={async (customPrompt) => {
                 setCustomPromptLoading(true);
                 try {
-                  const response = await fetch('https://meesho-seller-genius.onrender.com/api/social-media/custom-ai', {
+                  const response = await fetch(`${API_BASE_URL}/api/social-media/custom-ai`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text: description, customPrompt }),
+                    credentials: 'include',
                   });
                   if (!response.ok) throw new Error('Failed to run custom AI prompt');
                   const data = await response.json();
                   setDescription(data.result);
                   setShowCustomDescriptionPrompt(false);
+                  setTimeout(() => handleSubmit(), 0); // Auto-generate post
                 } catch (err) {
                   toast.error(err.message || 'Failed to run custom AI prompt');
                 } finally {
@@ -325,8 +358,59 @@ const SocialMediaPost = () => {
               loading={loading}
               handleReset={handleReset}
             />
+            <button
+              className="w-full p-2 rounded-lg mt-2 bg-[#405DE6] text-white font-semibold text-lg shadow hover:bg-[#3045a3] transition"
+              type="button"
+              onClick={handlePublish}
+            >
+              Post on Instagram
+            </button>
+            {showInstagramModal && (
+              <div
+                style={{
+                  position: 'fixed',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  background: 'rgba(0,0,0,0.5)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 1000
+                }}
+              >
+                <div style={{ background: '#fff', padding: 24, borderRadius: 8, minWidth: 300 }}>
+                  <h2 className="text-xl font-bold mb-2">Enter your Instagram ID</h2>
+                  <p className="mb-4">To publish, please enter your Instagram username. This will be saved for future use.</p>
+                  <input
+                    type="text"
+                    className="w-full border rounded-lg px-4 py-2 mt-2"
+                    value={instagramId}
+                    onChange={e => setInstagramId(e.target.value)}
+                    placeholder="Enter your Instagram username"
+                  />
+                  <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={() => {
+                        localStorage.setItem('instagramId', instagramId);
+                        setShowInstagramModal(false);
+                        toast.success('Instagram ID saved! Automated posting coming soon.');
+                      }}
+                      className="bg-[#405DE6] text-white px-4 py-2 rounded"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setShowInstagramModal(false)}
+                      className="bg-gray-300 px-4 py-2 rounded"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </form>
+        {/* Add this button below the form actions */}
         {/* Instagram Preview on the right, always rendered, spinner while loading */}
         <div className="w-full max-w-2xl min-h-[600px] overflow-auto flex items-center justify-end">
           {loading ? (
