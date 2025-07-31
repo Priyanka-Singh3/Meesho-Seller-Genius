@@ -10,6 +10,8 @@ const Signup = ({ onSwitchToLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState({ email: '', password: '' });
+  const [instagramId, setInstagramId] = useState('');
+  const [facebookId, setFacebookId] = useState('');
   const navigate = useNavigate();
   const [user, loading] = useAuthState(auth);
 
@@ -35,6 +37,9 @@ const Signup = ({ onSwitchToLogin }) => {
     if (hasError) return;
     try {
       await signUp(email, password);
+      // Save IDs to localStorage as a prototype
+      localStorage.setItem('instagramId', instagramId);
+      localStorage.setItem('facebookId', facebookId);
       toast.success('Signup successful!');
       navigate('/dashboard');
     } catch (err) {
@@ -74,6 +79,26 @@ const Signup = ({ onSwitchToLogin }) => {
             placeholder="Enter your password"
           />
           {error.password && <span className="text-xs text-[#e53935] mt-1 block">{error.password}</span>}
+        </div>
+        <div className="mb-4">
+          <label className="block mb-1 text-sm font-medium text-[#34313b]">Instagram ID (optional)</label>
+          <input
+            type="text"
+            className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:border-[#9B177E] transition text-base border-[#d3d3d3] bg-white"
+            value={instagramId}
+            onChange={e => setInstagramId(e.target.value)}
+            placeholder="Enter your Instagram username"
+          />
+        </div>
+        <div className="mb-4">
+          <label className="block mb-1 text-sm font-medium text-[#34313b]">Facebook ID (optional)</label>
+          <input
+            type="text"
+            className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:border-[#9B177E] transition text-base border-[#d3d3d3] bg-white"
+            value={facebookId}
+            onChange={e => setFacebookId(e.target.value)}
+            placeholder="Enter your Facebook username"
+          />
         </div>
         <button
           type="submit"

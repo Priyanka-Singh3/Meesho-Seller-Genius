@@ -5,23 +5,24 @@ const axios = require('axios');
 require('dotenv').config();
 const HF_API_KEY = process.env.HF_API_KEY;
 
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-console.log('Starting backend server...');
-
 const corsOptions = {
   origin: 'http://localhost:5173',
   credentials: true,
 };
-app.use(cors(corsOptions));
 
+const app = express();
+
+app.use(cors(corsOptions));
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+const PORT = process.env.PORT || 5050;
+
+console.log('Starting backend server...');
 
 // Routes
 const socialMediaRoutes = require('./routes/socialMedia');
 app.use('/api/social-media', socialMediaRoutes);
+
 
 // Test route to verify backend is running
 app.get('/test', (req, res) => {
