@@ -30,21 +30,23 @@ const getRegionFill = (region, isSelected, mapMode) => {
   return '#E5E7EB';
 };
 
-const IndiaMap = ({ regions, onSelect, selectedRegion, mapMode }) => {
+const IndiaMap = ({ regions = [], onSelect, selectedRegion, mapMode }) => {
   const [indiaTopoJson, setIndiaTopoJson] = useState(null);
+
+  // Ensure regions is always an array
+  const safeRegions = Array.isArray(regions) ? regions : [];
 
   useEffect(() => {
     fetch(INDIA_TOPOJSON_URL)
       .then(res => res.json())
       .then(setIndiaTopoJson)
       .catch(err => {
-        // Handle error (show message, fallback, etc.)
         console.error('Failed to load India TopoJSON:', err);
       });
   }, []);
 
   if (!indiaTopoJson) {
-    return <div className="text-center py-8">Loading India map…</div>;
+    return <div className="text-center py-8">Loading India map...</div>;
   }
 
   return (
@@ -59,7 +61,7 @@ const IndiaMap = ({ regions, onSelect, selectedRegion, mapMode }) => {
         <Geographies geography={indiaTopoJson}>
           {({ geographies }) =>
             geographies.map((geo) => {
-              const region = regions.find(r =>
+              const region = safeRegions.find(r =>
                 geo.properties && (r.stateCode === geo.id || r.name === geo.properties.st_nm)
               );
               const isSelected = selectedRegion && region && selectedRegion.name === region.name;
@@ -82,7 +84,7 @@ const IndiaMap = ({ regions, onSelect, selectedRegion, mapMode }) => {
             })
           }
         </Geographies>
-        {regions.map((region) => (
+        {safeRegions.map((region) => (
           <Marker key={region.name} coordinates={region.coordinates}>
             <circle
               r={6}
