@@ -19,7 +19,9 @@ import FormActions from '../../components/social-media/FormActions';
 
 // const API_URL = 'http://meesho-seller-genius.onrender.com/api/social-media/generate';
 
-const API_URL = 'http://localhost:5050/api/social-media/generate';
+// const API_URL = 'http://localhost:5050/api/social-media/generate';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_URL = `${API_BASE_URL}/api/social-media/generate`;
 
 const LANGUAGES = [
   { code: 'en', name: 'English' },
@@ -172,7 +174,7 @@ const SocialMediaPost = () => {
     if (!captions || !description) return;
     setRefiningDescription(true);
     try {
-      const response = await fetch('http://localhost:5050/api/social-media/refine-description', {
+      const response = await fetch(`${API_BASE_URL}/api/social-media/refine-description`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description }),
@@ -248,7 +250,7 @@ const SocialMediaPost = () => {
                 if (!title || !description) return;
                 setRefiningInputCaption(true);
                 try {
-                  const response = await fetch('http://localhost:5050/api/social-media/refine-caption', {
+                  const response = await fetch(`${API_BASE_URL}/api/social-media/refine-caption`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ caption: title, description }),
@@ -267,7 +269,7 @@ const SocialMediaPost = () => {
               onCustomPrompt={async (customPrompt) => {
                 setCustomPromptLoading(true);
                 try {
-                  const response = await fetch('http://localhost:5050/api/social-media/custom-ai', {
+                  const response = await fetch(`${API_BASE_URL}/api/social-media/custom-ai`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text: title, customPrompt }),
@@ -301,7 +303,7 @@ const SocialMediaPost = () => {
                 if (!description) return;
                 setRefiningInputDescription(true);
                 try {
-                  const response = await fetch('http://localhost:5050/api/social-media/refine-description', {
+                  const response = await fetch(`${API_BASE_URL}/api/social-media/refine-description`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ description }),
@@ -321,7 +323,7 @@ const SocialMediaPost = () => {
               onCustomPrompt={async (customPrompt) => {
                 setCustomPromptLoading(true);
                 try {
-                  const response = await fetch('http://localhost:5050/api/social-media/custom-ai', {
+                  const response = await fetch(`${API_BASE_URL}/api/social-media/custom-ai`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text: description, customPrompt }),
