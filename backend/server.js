@@ -12,7 +12,7 @@ const HF_API_KEY = process.env.HF_API_KEY;
 
 const corsOptions = {
   // origin: 'https://meesho-eight.vercel.app',
-  origin: 'http://localhost:5173',
+  origin: 'meesho1-one.vercel.app',
   credentials: true,
 };
 
