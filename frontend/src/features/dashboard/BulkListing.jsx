@@ -28,6 +28,8 @@ export default function CSVProductUploadForm() {
   const [editingColors, setEditingColors] = useState({});
   const [individualProcessing, setIndividualProcessing] = useState({});
   const [popupContent, setPopupContent] = useState(null);
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 
   const fileInputRef = useRef(null);
 
@@ -83,7 +85,7 @@ export default function CSVProductUploadForm() {
       formData.append('image', imageBlob, 'image.png');
       formData.append('bg_color', bgColor);
 
-      const backendResponse = await fetch('https://meesho-seller-genius.onrender.com/remove-background', {
+      const backendResponse = await fetch(`${API_BASE_URL}/remove-background`, {
         method: 'POST',
         body: formData,
       });
@@ -96,27 +98,78 @@ export default function CSVProductUploadForm() {
     }
   };
 
-  // All-image processing
+  // // All-image processing
+  // const processAllImages = async () => {
+  //   setIsProcessingImages(true);
+  //   setProcessingProgress(0);
+  //   const updatedData = [...csvData];
+  //   const total = updatedData.length;
+  //   for (let i = 0; i < total; i++) {
+  //     const item = updatedData[i];
+  //     const imageUrl = item[imageColumn];
+  //     if (imageUrl) {
+  //       try {
+  //         const processedImageUrl = await processImageBackground(imageUrl, selectedBgColor);
+  //         item.processedImageUrl = processedImageUrl;
+  //         item.backgroundColor = selectedBgColor;
+  //         item.processed = true;
+  //       } catch { }
+  //     }
+  //     setProcessingProgress(((i + 1) / total) * 100);
+  //   }
+  //   setCsvData(updatedData);
+  //   setIsProcessingImages(false);
+  // };
+
   const processAllImages = async () => {
     setIsProcessingImages(true);
     setProcessingProgress(0);
     const updatedData = [...csvData];
-    const total = updatedData.length;
-    for (let i = 0; i < total; i++) {
-      const item = updatedData[i];
-      const imageUrl = item[imageColumn];
-      if (imageUrl) {
-        try {
-          const processedImageUrl = await processImageBackground(imageUrl, selectedBgColor);
-          item.processedImageUrl = processedImageUrl;
-          item.backgroundColor = selectedBgColor;
-          item.processed = true;
-        } catch { }
-      }
-      setProcessingProgress(((i + 1) / total) * 100);
+
+    const itemsWithImages = updatedData.filter(item => item[imageColumn]);
+    const total = itemsWithImages.length;
+
+    if (total === 0) {
+      setIsProcessingImages(false);
+      return;
     }
-    setCsvData(updatedData);
-    setIsProcessingImages(false);
+
+    let completed = 0;
+    const batchSize = 5; // Process 5 images concurrently
+
+    try {
+      for (let i = 0; i < itemsWithImages.length; i += batchSize) {
+        const batch = itemsWithImages.slice(i, i + batchSize);
+
+        const batchPromises = batch.map(async (item) => {
+          try {
+            const processedImageUrl = await processImageBackground(item[imageColumn], selectedBgColor);
+            item.processedImageUrl = processedImageUrl;
+            item.backgroundColor = selectedBgColor;
+            item.processed = true;
+
+            return { success: true, item };
+          } catch (error) {
+            console.error(`Failed to process image for item ${item.id}:`, error);
+            return { success: false, item, error };
+          }
+        });
+
+        // Wait for the entire batch to complete
+        const results = await Promise.allSettled(batchPromises);
+
+        // Update progress after batch completion (safer for state updates)
+        completed += results.length;
+        setProcessingProgress((completed / total) * 100);
+
+        // Update UI after each batch for better responsiveness
+        setCsvData([...updatedData]);
+      }
+    } catch (error) {
+      console.error('Batch processing error:', error);
+    } finally {
+      setIsProcessingImages(false);
+    }
   };
 
   // Per-row image processing
@@ -189,7 +242,7 @@ export default function CSVProductUploadForm() {
         csvRowData: item // Send the entire CSV row data
       };
 
-      const response = await fetch('https://meesho-seller-genius.onrender.com/generate-copy', {
+      const response = await fetch(`${API_BASE_URL}/generate-copy`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -451,7 +504,7 @@ export default function CSVProductUploadForm() {
             <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#9B177E] to-[#F43F5E]">BulkGenius</h2>
             <div className="flex items-center gap-4">
               <span className="text-sm text-gray-600">Total Products: {csvData.length}</span>
-              
+
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="bg-gray-500 text-white px-4 py-2 rounded-xl hover:bg-gray-600 transition flex items-center gap-2"
