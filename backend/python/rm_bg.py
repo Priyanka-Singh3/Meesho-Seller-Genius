@@ -1,5 +1,211 @@
 #!/usr/bin/env python3
 
+#!/usr/bin/env python3
+
+import sys
+import io
+import os
+import base64
+import logging
+from PIL import Image, ImageColor
+
+# Configure logging to stderr FIRST
+logging.basicConfig(
+    level=logging.INFO, 
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    stream=sys.stderr
+)
+logger = logging.getLogger(__name__)
+
+# Force rembg to use the cached model location
+# Try Render path first, fallback to Docker path
+model_paths = [
+    '/opt/render/project/src/.u2net',  # Render path
+    '/root/.u2net',                    # Docker path
+    os.path.expanduser('~/.u2net')     # Default fallback
+]
+
+for path in model_paths:
+    if os.path.exists(path) or not os.environ.get('REMBG_MODELS_PATH'):
+        os.environ['REMBG_MODELS_PATH'] = path
+        break
+
+# NOW we can use logger safely
+logger.info(f"Using model path: {os.environ.get('REMBG_MODELS_PATH')}")
+
+# Global session cache to avoid reloading model
+_session_cache = None
+
+def get_rembg_session():
+    """Get or create rembg session with silueta model (cached during Docker build)"""
+    global _session_cache
+    
+    if _session_cache is not None:
+        return _session_cache
+    
+    try:
+        from rembg import new_session
+        
+        logger.info("Creating new rembg silueta session...")
+        _session_cache = new_session('silueta')
+        logger.info("rembg session created successfully")
+        return _session_cache
+        
+    except ImportError as e:
+        logger.error("rembg not installed. Please install with: pip install rembg")
+        raise ImportError("rembg library is required. Install with: pip install rembg")
+    except Exception as e:
+        logger.error(f"Failed to create rembg session: {e}")
+        raise
+
+def preprocess_image(image, max_size=(800, 800)):  # Reduced from 1024 to 800
+    """Preprocess image to optimize for processing - more aggressive resizing"""
+    try:
+        original_size = image.size
+        
+        # More aggressive resizing for faster processing
+        if image.size[0] > max_size[0] or image.size[1] > max_size[1]:
+            ratio = min(max_size[0] / image.size[0], max_size[1] / image.size[1])
+            new_size = (int(image.size[0] * ratio), int(image.size[1] * ratio))
+            # Use NEAREST for faster resizing (trade quality for speed)
+            image = image.resize(new_size, Image.Resampling.NEAREST)
+            logger.info(f"Resized image from {original_size} to {image.size}")
+        
+        # Convert to RGB if not already (removes alpha channel complexity)
+        if image.mode in ('RGBA', 'LA', 'P'):
+            # Create white background for transparent images
+            background = Image.new('RGB', image.size, (255, 255, 255))
+            if image.mode == 'P':
+                image = image.convert('RGBA')
+            if image.mode in ('RGBA', 'LA'):
+                background.paste(image, mask=image.split()[-1])
+                image = background
+            else:
+                image = image.convert('RGB')
+        
+        return image
+    except Exception as e:
+        logger.error(f"Image preprocessing error: {e}")
+        return image
+
+def remove_background_rembg(image_bytes, bg_color='#ffffff'):
+    """Remove background using rembg with optimizations"""
+    try:
+        from rembg import remove
+        
+        # Get cached session
+        session = get_rembg_session()
+        
+        logger.info("Removing background with rembg silueta...")
+        
+        # Remove background
+        output_bytes = remove(image_bytes, session=session)
+        
+        # Convert to PIL Image
+        output_image = Image.open(io.BytesIO(output_bytes)).convert("RGBA")
+        logger.info(f"Background removed, output size: {output_image.size}")
+        
+        # Parse background color
+        try:
+            bg_rgb = ImageColor.getrgb(bg_color)
+        except ValueError:
+            logger.warning(f"Invalid color format: {bg_color}, using white")
+            bg_rgb = (255, 255, 255)
+        
+        # Create background with the specified color
+        background = Image.new("RGB", output_image.size, bg_rgb)  # Use RGB instead of RGBA
+        
+        # Paste the foreground onto background using alpha channel as mask
+        background.paste(output_image, (0, 0), output_image)
+        
+        # Save to bytes with lower quality for speed
+        buffered = io.BytesIO()
+        background.save(buffered, format="JPEG", quality=85, optimize=True)  # JPEG is faster than PNG
+        
+        logger.info("Background replacement completed successfully")
+        return buffered.getvalue()
+        
+    except Exception as e:
+        logger.error(f"Background removal failed: {e}")
+        raise
+
+def main():
+    try:
+        # Step 1: Read background color from CLI args
+        bg_color = sys.argv[1] if len(sys.argv) > 1 else '#ffffff'
+        logger.info(f"Processing with background color: {bg_color}")
+        
+        # Step 2: Load input image from stdin
+        try:
+            if sys.platform == 'win32':
+                import msvcrt
+                msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
+        except Exception as e:
+            logger.warning(f"Could not set binary mode for stdin: {e}")
+        
+        image_bytes = sys.stdin.buffer.read()
+        if not image_bytes:
+            logger.error("No image data received from stdin")
+            sys.exit(1)
+            
+        logger.info(f"Received image data: {len(image_bytes)} bytes")
+        
+        # Step 3: Validate and preprocess input image
+        try:
+            test_image = Image.open(io.BytesIO(image_bytes))
+            logger.info(f"Input image size: {test_image.size}, mode: {test_image.mode}")
+            
+            # Always preprocess to reduce size and complexity
+            test_image = preprocess_image(test_image, max_size=(800, 800))  # Smaller max size
+            
+            # Convert back to bytes
+            buffer = io.BytesIO()
+            test_image.save(buffer, format='PNG', optimize=True)
+            image_bytes = buffer.getvalue()
+            logger.info(f"Preprocessed image size: {len(image_bytes)} bytes")
+                
+        except Exception as e:
+            logger.error(f"Failed to load input image: {e}")
+            print("Error: Invalid image format", file=sys.stderr)
+            sys.exit(1)
+        
+        # Step 4: Process with rembg
+        logger.info("Starting background removal process...")
+        try:
+            final_bytes = remove_background_rembg(image_bytes, bg_color)
+            logger.info(f"Background removal completed, output size: {len(final_bytes)} bytes")
+        except MemoryError:
+            logger.error("Out of memory during processing")
+            print("Error: Image too large for processing", file=sys.stderr)
+            sys.exit(1)
+        except Exception as e:
+            logger.error(f"Background removal failed: {e}")
+            print(f"Error: Background removal failed - {e}", file=sys.stderr)
+            sys.exit(1)
+        
+        # Step 5: Convert result to base64 and print to stdout
+        try:
+            b64_output = base64.b64encode(final_bytes).decode("utf-8")
+            print(b64_output, end='')
+            sys.stdout.flush()
+            logger.info("Processing completed successfully")
+        except Exception as e:
+            logger.error(f"Failed to encode output: {e}")
+            print(f"Error: Failed to encode output - {e}", file=sys.stderr)
+            sys.exit(1)
+        
+    except KeyboardInterrupt:
+        logger.info("Processing interrupted by user")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+    
+'''
 import sys
 import io
 import os
@@ -201,7 +407,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-'''
+
 import sys
 import io
 import os
