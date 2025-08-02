@@ -1,24 +1,15 @@
 # 1. Use Node base image
 FROM node:18
 
-# 2. Install system dependencies for OpenGL, Python, and image processing
+# 2. Install minimal system dependencies for rembg
 RUN apt-get update && \
     apt-get install -y \
     python3 \
     python3-pip \
     python3-venv \
-    # Essential OpenGL and graphics libraries for rembg
+    # Only essential OpenGL libraries for rembg
     libgl1-mesa-glx \
     libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    libgomp1 \
-    # Essential libraries for OpenCV and image processing
-    libglib2.0-dev \
-    libjpeg-dev \
-    libpng-dev \
-    libtiff-dev \
     # Clean up to reduce image size
     && rm -rf /var/lib/apt/lists/*
 
@@ -35,23 +26,21 @@ COPY backend/python/requirements.txt ./requirements.txt
 RUN /opt/venv/bin/pip install --upgrade pip && \
     /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
-# 7. Make venv default and set environment variables
+# 7. Make venv default BEFORE downloading model
 ENV PATH="/opt/venv/bin:$PATH"
-ENV PYTHONPATH="/app"
-ENV DISPLAY=:99
-ENV QT_QPA_PLATFORM=offscreen
 
-# 8. Copy full backend code (after deps)
+# 8. Pre-download rembg model (ensure it matches Python script)
+RUN mkdir -p /root/.u2net && \
+    python3 -c "from rembg import new_session; print('Downloading silueta model...'); new_session('silueta'); print('Silueta model cached successfully in /root/.u2net/')"
+
+# 9. Copy full backend code (after deps)
 COPY backend/ .
 
-# 9. Install Node dependencies
+# 10. Install Node dependencies
 RUN npm install
 
-# 10. Create directory for rembg models (optional - helps with caching)
-RUN mkdir -p /app/.u2net
-
 # 11. Expose Node.js port
-EXPOSE 3000
+EXPOSE 5050
 
 # 12. Run backend server
 CMD ["node", "server.js"]
