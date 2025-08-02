@@ -1,0 +1,29 @@
+# Node (backend)
+backend/node_modules/
+backend/dist/
+backend/build/
+backend/npm-debug.log
+backend/yarn-debug.log
+backend/yarn-error.log
+
+# Python (backend)
+backend/__pycache__/
+backend/env/
+backend/venv/
+backend/.env
+backend/python/.env
+
+# Frontend (not needed in backend Docker image)
+frontend/
+
+# MacOS system files
+.DS_Store
+
+# Logs
+*.log
+
+# IDE/editor config
+.vscode/
+.idea/
+
+docker.env

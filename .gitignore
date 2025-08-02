@@ -30,3 +30,4 @@ backend/python/.env
 .vscode/
 .idea/
 .env
+docker.env
