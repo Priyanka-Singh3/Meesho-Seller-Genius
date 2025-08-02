@@ -318,7 +318,7 @@ app.post('/remove-background', upload.single('image'), async (req, res) => {
       python.kill('SIGKILL'); // Force kill
       sendResponse(500, { error: 'Processing timeout - operation took too long' });
     }
-  }, 120000); // 2 minutes timeout for rembg
+  }, 600000); // 2 minutes timeout for rembg
 
   let base64Image = '';
   let errorOutput = '';
@@ -446,6 +446,300 @@ app.post('/remove-background', upload.single('image'), async (req, res) => {
 
   // Set up handlers for the initial Python process
   setupPythonHandlers(python);
+});
+
+// POST: Remove Background - Updated with 10 minute timeout and Render optimizations
+
+app.post('/remove-background', upload.single('image'), async (req, res) => {
+  let imageBuffer;
+  
+  // Check if image was uploaded as file or provided as URL
+  if (req.file) {
+    // File upload
+    imageBuffer = req.file.buffer;
+    console.log(`Processing uploaded file, size: ${imageBuffer.length} bytes`);
+  } else if (req.body.image_url) {
+    // URL provided
+    try {
+      console.log(`Downloading image from URL: ${req.body.image_url}`);
+      const response = await axios.get(req.body.image_url, {
+        responseType: 'arraybuffer',
+        timeout: 10000, // 10 second timeout
+        maxContentLength: 10 * 1024 * 1024, // 10MB max
+      });
+      
+      imageBuffer = Buffer.from(response.data);
+      console.log(`Downloaded image, size: ${imageBuffer.length} bytes`);
+    } catch (downloadError) {
+      console.error(`Failed to download image: ${downloadError.message}`);
+      return res.status(400).json({ 
+        error: 'Failed to download image from URL. Please check the URL is valid and accessible.' 
+      });
+    }
+  } else {
+    return res.status(400).json({ 
+      error: 'No image provided. Send either a file upload or image_url in the request body.' 
+    });
+  }
+
+  const bgColor = req.body.bg_color || '#ffffff';
+  
+  // Validate color format
+  const colorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+  if (!colorRegex.test(bgColor)) {
+    return res.status(400).json({ error: 'Invalid color format. Use hex format like #ffffff' });
+  }
+
+  console.log(`Processing background removal with color: ${bgColor}`);
+
+  // Python command detection - improved for different environments
+  let pythonCmd = 'python3'; // Default to python3
+  if (process.platform === 'win32') {
+    pythonCmd = 'python'; // Windows usually uses 'python'
+  }
+  
+  // Flag to prevent multiple responses
+  let responseHandled = false;
+  
+  const sendResponse = (statusCode, data) => {
+    if (!responseHandled && !res.headersSent) {
+      responseHandled = true;
+      if (statusCode === 200) {
+        res.set({
+          'Content-Type': 'image/png',
+          'Content-Length': data.length,
+          'Cache-Control': 'no-cache'
+        });
+        res.send(data);
+      } else {
+        res.status(statusCode).json(data);
+      }
+    }
+  };
+
+  // Send progress updates to prevent Render from timing out
+  const progressInterval = setInterval(() => {
+    if (!responseHandled) {
+      console.log('Background removal still processing...');
+      // Keep the connection alive
+      res.write(''); // Empty write to keep connection alive
+    }
+  }, 30000); // Every 30 seconds
+
+  const python = spawn(pythonCmd, [path.join(__dirname, 'python', 'rm_bg.py'), bgColor], {
+    // Optimize for cloud deployment
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: { 
+      ...process.env,
+      PYTHONUNBUFFERED: '1', // Ensure immediate output
+      OMP_NUM_THREADS: '1',   // Limit OpenMP threads for memory efficiency
+      NUMBA_CACHE_DIR: '/tmp' // Use /tmp for Numba cache on Linux
+    }
+  });
+  
+  // INCREASED TIMEOUT TO 10 MINUTES (600000ms)
+  const timeout = setTimeout(() => {
+    clearInterval(progressInterval);
+    if (!python.killed) {
+      console.log('Process timeout after 10 minutes, killing Python script...');
+      python.kill('SIGTERM'); // Try graceful termination first
+      
+      // Force kill after 5 seconds if graceful termination fails
+      setTimeout(() => {
+        if (!python.killed) {
+          python.kill('SIGKILL');
+        }
+      }, 5000);
+      
+      sendResponse(500, { error: 'Processing timeout - operation took longer than 10 minutes' });
+    }
+  }, 600000); // 10 MINUTES TIMEOUT
+
+  let base64Image = '';
+  let errorOutput = '';
+
+  // Handle Python process errors
+  python.on('error', (error) => {
+    clearTimeout(timeout);
+    clearInterval(progressInterval);
+    console.error(`Failed to start Python script: ${error}`);
+    
+    if (error.code === 'ENOENT') {
+      if (process.platform === 'win32' && pythonCmd === 'python') {
+        console.log('Retrying with "py" command...');
+        retryWithPyCommand();
+        return;
+      }
+      sendResponse(500, { 
+        error: 'Python not found. Please ensure Python is installed and added to PATH.' 
+      });
+    } else {
+      sendResponse(500, { error: 'Failed to start background removal process' });
+    }
+  });
+
+  // Function to retry with 'py' command on Windows
+  const retryWithPyCommand = () => {
+    const pythonRetry = spawn('py', [path.join(__dirname, 'python', 'rm_bg.py'), bgColor], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { 
+        ...process.env,
+        PYTHONUNBUFFERED: '1',
+        OMP_NUM_THREADS: '1',
+        NUMBA_CACHE_DIR: '/tmp'
+      }
+    });
+    
+    pythonRetry.on('error', (retryError) => {
+      clearInterval(progressInterval);
+      console.error(`Failed with py command: ${retryError}`);
+      sendResponse(500, { 
+        error: 'Python not found. Please install Python and ensure it\'s in PATH.' 
+      });
+    });
+
+    setupPythonHandlers(pythonRetry);
+  };
+
+  // Function to set up Python process handlers
+  const setupPythonHandlers = (pythonProcess) => {
+    // Send image data to Python script with error handling
+    try {
+      pythonProcess.stdin.write(imageBuffer);
+      pythonProcess.stdin.end();
+      console.log('Image data sent to Python script successfully');
+    } catch (writeError) {
+      clearTimeout(timeout);
+      clearInterval(progressInterval);
+      console.error(`Failed to write to Python stdin: ${writeError}`);
+      sendResponse(500, { error: 'Failed to send image data to processor' });
+      return;
+    }
+
+    // Collect stdout (base64 image) with progress logging
+    pythonProcess.stdout.on('data', (data) => {
+      const chunk = data.toString();
+      base64Image += chunk;
+      // Log progress without flooding console
+      if (base64Image.length % 10000 === 0) {
+        console.log(`Received ${base64Image.length} bytes of output...`);
+      }
+    });
+
+    // Collect stderr (error messages and logs)
+    pythonProcess.stderr.on('data', (data) => {
+      const errorMsg = data.toString();
+      console.log(`Python log: ${errorMsg.trim()}`);
+      errorOutput += errorMsg;
+    });
+
+    // Handle script completion
+    pythonProcess.on('close', (code) => {
+      clearTimeout(timeout);
+      clearInterval(progressInterval);
+      console.log(`Python process closed with code: ${code}`);
+      
+      if (code !== 0 && code !== null) {
+        console.error(`Python script failed with code ${code}`);
+        console.error(`Error output: ${errorOutput}`);
+        
+        // Provide specific error messages
+        if (errorOutput.includes('rembg not installed') || errorOutput.includes('No module named')) {
+          sendResponse(500, { 
+            error: 'rembg library not installed. Please install with: pip install rembg[cpu]' 
+          });
+        } else if (errorOutput.includes('Failed to load input image')) {
+          sendResponse(400, { 
+            error: 'Invalid image format. Please upload a valid image file.' 
+          });
+        } else if (errorOutput.includes('onnxruntime')) {
+          sendResponse(500, { 
+            error: 'Missing onnxruntime. Please install with: pip install onnxruntime' 
+          });
+        } else if (errorOutput.includes('CUDA') || errorOutput.includes('GPU')) {
+          sendResponse(500, { 
+            error: 'GPU/CUDA error. Running in CPU mode. This may take longer.' 
+          });
+        } else if (errorOutput.includes('Memory') || errorOutput.includes('memory')) {
+          sendResponse(500, { 
+            error: 'Insufficient memory. Try with a smaller image or restart the service.' 
+          });
+        } else {
+          sendResponse(500, { 
+            error: 'Background removal failed. Check server logs for details.',
+            details: errorOutput.substring(0, 200) // First 200 chars of error
+          });
+        }
+        return;
+      }
+
+      // Handle case where process was killed (code null)
+      if (code === null) {
+        console.error('Python process was killed or crashed');
+        sendResponse(500, { 
+          error: 'Background removal process was interrupted. This might be due to memory issues or model loading problems.' 
+        });
+        return;
+      }
+
+      try {
+        const cleanBase64 = base64Image.trim();
+        if (!cleanBase64) {
+          throw new Error('No image data returned from Python script');
+        }
+        
+        // Validate base64 format
+        if (!cleanBase64.match(/^[A-Za-z0-9+/]*={0,2}$/)) {
+          throw new Error('Invalid base64 format received');
+        }
+        
+        const imgBuffer = Buffer.from(cleanBase64, 'base64');
+        console.log(`Successfully processed image, output size: ${imgBuffer.length} bytes`);
+        
+        // Validate that we got a reasonable image size
+        if (imgBuffer.length < 100) {
+          throw new Error('Output image too small, likely corrupted');
+        }
+        
+        sendResponse(200, imgBuffer);
+        
+      } catch (decodeError) {
+        console.error(`Failed to decode base64 output: ${decodeError}`);
+        console.error(`Base64 length: ${base64Image.length}, First 100 chars: ${base64Image.substring(0, 100)}`);
+        sendResponse(500, { 
+          error: 'Failed to process image output',
+          details: decodeError.message
+        });
+      }
+    });
+
+    // Handle process exit
+    pythonProcess.on('exit', (code, signal) => {
+      if (signal) {
+        console.log(`Python process killed with signal: ${signal}`);
+      }
+    });
+
+    // Handle disconnect (important for cloud platforms)
+    pythonProcess.on('disconnect', () => {
+      console.log('Python process disconnected');
+      clearTimeout(timeout);
+      clearInterval(progressInterval);
+    });
+  };
+
+  // Set up handlers for the initial Python process
+  setupPythonHandlers(python);
+
+  // Handle client disconnect
+  req.on('close', () => {
+    console.log('Client disconnected, cleaning up...');
+    clearTimeout(timeout);
+    clearInterval(progressInterval);
+    if (!python.killed) {
+      python.kill();
+    }
+  });
 });
 
 // Health check endpoint
