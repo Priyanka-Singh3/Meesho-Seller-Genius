@@ -1,46 +1,52 @@
-# 1. Use Node base image
+# Use Node base image
 FROM node:18
 
-# 2. Install minimal system dependencies for rembg
+# Install system dependencies
 RUN apt-get update && \
     apt-get install -y \
     python3 \
     python3-pip \
     python3-venv \
-    # Only essential OpenGL libraries for rembg
     libgl1-mesa-glx \
     libglib2.0-0 \
-    # Clean up to reduce image size
+    libomp-dev \
+    libopenblas-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# 3. Create Python virtual environment
+# Create Python virtual environment
 RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# 4. Set working directory
+# Set working directory
 WORKDIR /app
 
-# 5. Copy Python dependencies first
+# Copy Python requirements first for better caching
 COPY backend/python/requirements.txt ./requirements.txt
 
-# 6. Install Python packages in virtual env
+# Install Python packages
 RUN /opt/venv/bin/pip install --upgrade pip && \
     /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
-# 7. Make venv default BEFORE downloading model
-ENV PATH="/opt/venv/bin:$PATH"
+# Set environment variables for performance and model path
+ENV OMP_NUM_THREADS=2
+ENV MKL_NUM_THREADS=2
+ENV NUMEXPR_NUM_THREADS=2
+ENV OPENBLAS_NUM_THREADS=2
+# Model will be cached by pre-deploy command at this path
+ENV REMBG_MODELS_PATH=/opt/render/project/src/.u2net
 
-# 8. Pre-download rembg model (ensure it matches Python script)
-RUN mkdir -p /root/.u2net && \
-    python3 -c "from rembg import new_session; print('Downloading silueta model...'); new_session('silueta'); print('Silueta model cached successfully in /root/.u2net/')"
+# Copy the pre-deploy script
+COPY predeploy.sh .
+RUN chmod +x predeploy.sh
 
-# 9. Copy full backend code (after deps)
+# Copy backend code
 COPY backend/ .
 
-# 10. Install Node dependencies
+# Install Node dependencies
 RUN npm install
 
-# 11. Expose Node.js port
+# Expose port
 EXPOSE 5050
 
-# 12. Run backend server
+# Start command
 CMD ["node", "server.js"]
