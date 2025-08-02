@@ -244,7 +244,261 @@ app.get('/test-hf', async (req, res) => {
 
 
 // POST: Remove Background
-app.post('/remove-background', upload.single('image'), (req, res) => {
+
+app.post('/remove-background', upload.single('image'), async (req, res) => {
+  let imageBuffer;
+  
+  // Check if image was uploaded as file or provided as URL
+  if (req.file) {
+    // File upload
+    imageBuffer = req.file.buffer;
+    console.log(`Processing uploaded file, size: ${imageBuffer.length} bytes`);
+  } else if (req.body.image_url) {
+    // URL provided
+    try {
+      console.log(`Downloading image from URL: ${req.body.image_url}`);
+      const response = await axios.get(req.body.image_url, {
+        responseType: 'arraybuffer',
+        timeout: 10000, // 10 second timeout
+        maxContentLength: 10 * 1024 * 1024, // 10MB max
+      });
+      
+      imageBuffer = Buffer.from(response.data);
+      console.log(`Downloaded image, size: ${imageBuffer.length} bytes`);
+    } catch (downloadError) {
+      console.error(`Failed to download image: ${downloadError.message}`);
+      return res.status(400).json({ 
+        error: 'Failed to download image from URL. Please check the URL is valid and accessible.' 
+      });
+    }
+  } else {
+    return res.status(400).json({ 
+      error: 'No image provided. Send either a file upload or image_url in the request body.' 
+    });
+  }
+
+  const bgColor = req.body.bg_color || '#ffffff';
+  
+  // Validate color format
+  const colorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+  if (!colorRegex.test(bgColor)) {
+    return res.status(400).json({ error: 'Invalid color format. Use hex format like #ffffff' });
+  }
+
+  console.log(`Processing background removal with color: ${bgColor}`);
+
+  // Python command detection
+  let pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+  
+  // Flag to prevent multiple responses
+  let responseHandled = false;
+  
+  const sendResponse = (statusCode, data) => {
+    if (!responseHandled && !res.headersSent) {
+      responseHandled = true;
+      if (statusCode === 200) {
+        res.set({
+          'Content-Type': 'image/png',
+          'Content-Length': data.length,
+          'Cache-Control': 'no-cache'
+        });
+        res.send(data);
+      } else {
+        res.status(statusCode).json(data);
+      }
+    }
+  };
+
+  const python = spawn(pythonCmd, [path.join(__dirname, 'python', 'rm_bg.py'), bgColor]);
+  
+  // Increased timeout for rembg processing
+  const timeout = setTimeout(() => {
+    if (!python.killed) {
+      console.log('Process timeout, killing Python script...');
+      python.kill('SIGKILL'); // Force kill
+      sendResponse(500, { error: 'Processing timeout - operation took too long' });
+    }
+  }, 120000); // 2 minutes timeout for rembg
+
+  let base64Image = '';
+  let errorOutput = '';
+
+  // Handle Python process errors
+  python.on('error', (error) => {
+    clearTimeout(timeout);
+    console.error(`Failed to start Python script: ${error}`);
+    
+    if (error.code === 'ENOENT') {
+      if (process.platform === 'win32' && pythonCmd === 'python') {
+        console.log('Retrying with "py" command...');
+        retryWithPyCommand();
+        return;
+      }
+      sendResponse(500, { 
+        error: 'Python not found. Please ensure Python is installed and added to PATH.' 
+      });
+    } else {
+      sendResponse(500, { error: 'Failed to start background removal process' });
+    }
+  });
+
+  // Function to retry with 'py' command on Windows
+  const retryWithPyCommand = () => {
+    const pythonRetry = spawn('py', [path.join(__dirname, 'python', 'rm_bg.py'), bgColor]);
+    
+    pythonRetry.on('error', (retryError) => {
+      console.error(`Failed with py command: ${retryError}`);
+      sendResponse(500, { 
+        error: 'Python not found. Please install Python and ensure it\'s in PATH.' 
+      });
+    });
+
+    setupPythonHandlers(pythonRetry);
+  };
+
+  // Function to set up Python process handlers
+  const setupPythonHandlers = (pythonProcess) => {
+    // Send image data to Python script
+    try {
+      pythonProcess.stdin.write(imageBuffer);
+      pythonProcess.stdin.end();
+    } catch (writeError) {
+      console.error(`Failed to write to Python stdin: ${writeError}`);
+      sendResponse(500, { error: 'Failed to send image data to processor' });
+      return;
+    }
+
+    // Collect stdout (base64 image)
+    pythonProcess.stdout.on('data', (data) => {
+      base64Image += data.toString();
+    });
+
+    // Collect stderr (error messages and logs)
+    pythonProcess.stderr.on('data', (data) => {
+      const errorMsg = data.toString();
+      console.log(`Python log: ${errorMsg.trim()}`);
+      errorOutput += errorMsg;
+    });
+
+    // Handle script completion
+    pythonProcess.on('close', (code) => {
+      clearTimeout(timeout);
+      console.log(`Python process closed with code: ${code}`);
+      
+      if (code !== 0 && code !== null) {
+        console.error(`Python script failed with code ${code}`);
+        console.error(`Error output: ${errorOutput}`);
+        
+        // Provide specific error messages
+        if (errorOutput.includes('rembg not installed') || errorOutput.includes('No module named')) {
+          sendResponse(500, { 
+            error: 'rembg library not installed. Please install with: pip install rembg[cpu]' 
+          });
+        } else if (errorOutput.includes('Failed to load input image')) {
+          sendResponse(400, { 
+            error: 'Invalid image format. Please upload a valid image file.' 
+          });
+        } else if (errorOutput.includes('onnxruntime')) {
+          sendResponse(500, { 
+            error: 'Missing onnxruntime. Please install with: pip install onnxruntime' 
+          });
+        } else {
+          sendResponse(500, { 
+            error: 'Background removal failed. Check server logs for details.' 
+          });
+        }
+        return;
+      }
+
+      // Handle case where process was killed (code null)
+      if (code === null) {
+        console.error('Python process was killed or crashed');
+        sendResponse(500, { 
+          error: 'Background removal process was interrupted. This might be due to memory issues or model loading problems.' 
+        });
+        return;
+      }
+
+      try {
+        const cleanBase64 = base64Image.trim();
+        if (!cleanBase64) {
+          throw new Error('No image data returned from Python script');
+        }
+        
+        const imgBuffer = Buffer.from(cleanBase64, 'base64');
+        console.log(`Successfully processed image, output size: ${imgBuffer.length} bytes`);
+        sendResponse(200, imgBuffer);
+        
+      } catch (decodeError) {
+        console.error(`Failed to decode base64 output: ${decodeError}`);
+        console.error(`Base64 length: ${base64Image.length}, First 100 chars: ${base64Image.substring(0, 100)}`);
+        sendResponse(500, { error: 'Failed to process image output' });
+      }
+    });
+
+    // Handle process exit
+    pythonProcess.on('exit', (code, signal) => {
+      if (signal) {
+        console.log(`Python process killed with signal: ${signal}`);
+      }
+    });
+  };
+
+  // Set up handlers for the initial Python process
+  setupPythonHandlers(python);
+});
+
+// Health check endpoint
+app.get('/health/rembg', (req, res) => {
+  let pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+  
+  const checkPython = (cmd) => {
+    const python = spawn(cmd, ['-c', 'import rembg, onnxruntime; print("All dependencies available")']);
+    
+    let output = '';
+    let errorOutput = '';
+    
+    python.stdout.on('data', (data) => output += data.toString());
+    python.stderr.on('data', (data) => errorOutput += data.toString());
+    
+    python.on('close', (code) => {
+      if (code === 0) {
+        res.json({ 
+          status: 'healthy', 
+          rembg: 'available', 
+          python_cmd: cmd,
+          output: output.trim()
+        });
+      } else {
+        if (process.platform === 'win32' && cmd === 'python') {
+          checkPython('py');
+        } else {
+          res.status(500).json({ 
+            status: 'unhealthy', 
+            error: errorOutput || 'Dependencies not available',
+            python_cmd: cmd
+          });
+        }
+      }
+    });
+    
+    python.on('error', (error) => {
+      if (error.code === 'ENOENT') {
+        if (process.platform === 'win32' && cmd === 'python') {
+          checkPython('py');
+        } else {
+          res.status(500).json({ status: 'unhealthy', error: 'Python not available' });
+        }
+      } else {
+        res.status(500).json({ status: 'unhealthy', error: error.message });
+      }
+    });
+  };
+  
+  checkPython(pythonCmd);
+});
+
+/*app.post('/remove-background', upload.single('image'), (req, res) => {
   if (!req.file) return res.status(400).send('No image uploaded');
   const bgColor = req.body.bg_color || '#ffffff';
   const python = spawn('python', [path.join(__dirname, 'python', 'rm_bg.py'), bgColor]);
@@ -262,7 +516,7 @@ app.post('/remove-background', upload.single('image'), (req, res) => {
     res.set('Content-Type', 'image/png');
     res.send(imgBuffer);
   });
-});
+});*/
 
 // // POST: Generate Product Copy
 
