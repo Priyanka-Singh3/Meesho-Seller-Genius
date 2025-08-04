@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import axios from 'axios'
 import {
   ChevronLeft, ChevronRight, Upload, Eye, Palette, Wand2, Save, Edit2, Check, X, Undo2
 } from 'lucide-react';
@@ -75,28 +76,556 @@ export default function CSVProductUploadForm() {
   };
 
   // Actual background processing: posts the image to backend and gets the processed image
-  const processImageBackground = async (imageUrl, bgColor) => {
+// Replace your processImageBackground function with this version that handles large files properly:
+
+const processImageBackground = async (imageUrl, bgColor) => {
+  console.log('🔍 ULTIMATE DEBUG - Finding exact disconnect cause');
+  
+  try {
+    const imageResponse = await fetch(imageUrl);
+    const originalBlob = await imageResponse.blob();
+    
+    const formData = new FormData();
+    formData.append('image', originalBlob, 'image.jpg');
+    formData.append('bg_color', bgColor);
+
+    console.log('🚀 Starting XMLHttpRequest with COMPLETE event monitoring...');
+    
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const startTime = Date.now();
+      let uploadCompleted = false;
+      let disconnectReason = 'unknown';
+      
+      // Monitor EVERY possible disconnect source
+      const logEvent = (event, details = '') => {
+        const elapsed = Date.now() - startTime;
+        console.log(`[${elapsed}ms] 📊 ${event} ${details}`);
+      };
+      
+      // 1. Monitor readyState changes for anomalies
+      xhr.onreadystatechange = () => {
+        const states = ['UNSENT', 'OPENED', 'HEADERS_RECEIVED', 'LOADING', 'DONE'];
+        logEvent('READYSTATE', `${xhr.readyState} (${states[xhr.readyState]}) Status: ${xhr.status}`);
+        
+        // Check for premature state changes
+        if (xhr.readyState === 4 && xhr.status === 0 && !uploadCompleted) {
+          disconnectReason = 'Premature readyState 4 with status 0 - Network error or CORS issue';
+          logEvent('💥 DISCONNECT DETECTED', disconnectReason);
+        }
+      };
+      
+      // 2. Upload event monitoring
+      xhr.upload.onloadstart = () => logEvent('UPLOAD_START');
+      xhr.upload.onprogress = (e) => {
+        logEvent('UPLOAD_PROGRESS', `${e.loaded}/${e.total} (${((e.loaded/e.total)*100).toFixed(1)}%)`);
+      };
+      xhr.upload.onload = () => {
+        uploadCompleted = true;
+        logEvent('✅ UPLOAD_COMPLETE', 'Upload finished successfully');
+      };
+      xhr.upload.onloadend = () => logEvent('UPLOAD_END');
+      xhr.upload.onabort = () => {
+        disconnectReason = 'Upload was aborted by browser or user';
+        logEvent('💥 UPLOAD_ABORT', disconnectReason);
+      };
+      xhr.upload.onerror = (e) => {
+        disconnectReason = `Upload error: ${e.type} - ${e.message || 'Unknown upload error'}`;
+        logEvent('💥 UPLOAD_ERROR', disconnectReason);
+      };
+      xhr.upload.ontimeout = () => {
+        disconnectReason = 'Upload timeout';
+        logEvent('💥 UPLOAD_TIMEOUT', disconnectReason);
+      };
+      
+      // 3. Download/Response monitoring
+      xhr.onloadstart = () => logEvent('RESPONSE_START');
+      xhr.onprogress = (e) => {
+        if (e.lengthComputable) {
+          logEvent('RESPONSE_PROGRESS', `${e.loaded}/${e.total} (${((e.loaded/e.total)*100).toFixed(1)}%)`);
+        } else {
+          logEvent('RESPONSE_PROGRESS', `${e.loaded} bytes (unknown total)`);
+        }
+      };
+      xhr.onload = () => {
+        logEvent('✅ RESPONSE_COMPLETE', `Status: ${xhr.status}, Response size: ${xhr.response?.byteLength || 'unknown'}`);
+        
+        if (xhr.status === 200) {
+          const blob = new Blob([xhr.response], { type: 'image/jpeg' });
+          resolve(URL.createObjectURL(blob));
+        } else {
+          disconnectReason = `HTTP error: ${xhr.status} - ${xhr.statusText}`;
+          logEvent('💥 HTTP_ERROR', disconnectReason);
+          reject(new Error(disconnectReason));
+        }
+      };
+      xhr.onloadend = () => logEvent('RESPONSE_END');
+      
+      // 4. Error event monitoring
+      xhr.onabort = () => {
+        disconnectReason = 'Request was aborted';
+        logEvent('💥 REQUEST_ABORT', disconnectReason);
+        reject(new Error(disconnectReason));
+      };
+      xhr.onerror = (e) => {
+        disconnectReason = `Network error: ${e.type} - readyState: ${xhr.readyState}, status: ${xhr.status}`;
+        logEvent('💥 NETWORK_ERROR', disconnectReason);
+        
+        // Additional error diagnosis
+        if (xhr.status === 0) {
+          if (xhr.readyState === 4) {
+            disconnectReason += ' - CORS error or server unreachable';
+          } else {
+            disconnectReason += ' - Connection dropped during request';
+          }
+        }
+        
+        reject(new Error(disconnectReason));
+      };
+      xhr.ontimeout = () => {
+        disconnectReason = `Timeout after ${xhr.timeout}ms`;
+        logEvent('💥 TIMEOUT', disconnectReason);
+        reject(new Error(disconnectReason));
+      };
+      
+      // 5. Monitor browser events that could cause disconnection
+      const beforeUnloadHandler = () => {
+        logEvent('⚠️ BROWSER_BEFOREUNLOAD', 'User navigating away or closing tab');
+      };
+      
+      const visibilityChangeHandler = () => {
+        if (document.hidden) {
+          logEvent('⚠️ PAGE_HIDDEN', 'Tab became hidden - browser may throttle');
+        } else {
+          logEvent('ℹ️ PAGE_VISIBLE', 'Tab became visible again');
+        }
+      };
+      
+      window.addEventListener('beforeunload', beforeUnloadHandler);
+      document.addEventListener('visibilitychange', visibilityChangeHandler);
+      
+      // 6. Set up connection monitoring
+      const connectionMonitor = setInterval(() => {
+        if (!navigator.onLine) {
+          disconnectReason = 'Internet connection lost';
+          logEvent('💥 CONNECTION_LOST', disconnectReason);
+          clearInterval(connectionMonitor);
+          xhr.abort();
+        }
+      }, 1000);
+      
+      // 7. Configure and send request
+      logEvent('CONFIG', 'Configuring XMLHttpRequest...');
+      xhr.open('POST', `${API_BASE_URL}/remove-background`);
+      xhr.responseType = 'arraybuffer';
+      xhr.timeout = 180000; // 3 minutes
+      
+      // 8. Send with error catching
+      logEvent('SEND', 'Calling xhr.send()...');
+      try {
+        xhr.send(formData);
+        logEvent('SEND_SUCCESS', 'xhr.send() completed without throwing');
+      } catch (sendError) {
+        disconnectReason = `Send error: ${sendError.message}`;
+        logEvent('💥 SEND_ERROR', disconnectReason);
+        clearInterval(connectionMonitor);
+        window.removeEventListener('beforeunload', beforeUnloadHandler);
+        document.removeEventListener('visibilitychange', visibilityChangeHandler);
+        reject(new Error(disconnectReason));
+        return;
+      }
+      
+      // 9. Cleanup timeout
+      const cleanup = () => {
+        clearInterval(connectionMonitor);
+        window.removeEventListener('beforeunload', beforeUnloadHandler);
+        document.removeEventListener('visibilitychange', visibilityChangeHandler);
+      };
+      
+      // Override resolve/reject to include cleanup
+      const originalResolve = resolve;
+      const originalReject = reject;
+      
+      resolve = (value) => {
+        cleanup();
+        logEvent('🎉 FINAL_SUCCESS', 'Request completed successfully');
+        originalResolve(value);
+      };
+      
+      reject = (error) => {
+        cleanup();
+        logEvent('💥 FINAL_FAILURE', `Final disconnect reason: ${disconnectReason}`);
+        originalReject(error);
+      };
+    });
+    
+  } catch (error) {
+    console.error('💥 Outer catch:', error.message);
+    throw error;
+  }
+};
+
+
+
+// Test with maximum monitoring
+const runUltimateTest = async () => {
+  console.clear();
+  console.log('🚀 RUNNING ULTIMATE DISCONNECT DETECTION TEST\n');
+  
+  if (!csvData.length) {
+    alert('Load CSV first!');
+    return;
+  }
+  
+  const itemWithImage = csvData.find(item => item[imageColumn]);
+  if (!itemWithImage) {
+    alert('No images found!');
+    return;
+  }
+  
+  console.log('🖼️ Testing with:', itemWithImage[imageColumn]);
+  console.log('⏰ Starting at:', new Date().toISOString());
+  
+  try {
+    const result = await processImageBackground(itemWithImage[imageColumn], '#ff0000');
+    console.log('✅ SUCCESS - No disconnect detected!');
+    alert('✅ SUCCESS! Check console for complete event timeline.');
+    
+    // Show result
+    const img = document.createElement('img');
+    img.src = result;
+    img.style.maxWidth = '300px';
+    img.style.border = '3px solid green';
+    document.body.appendChild(img);
+    
+  } catch (error) {
+    console.error('💥 ULTIMATE TEST FAILED:', error.message);
+    console.log('\n📋 DISCONNECT ANALYSIS:');
+    console.log('- Check the logs above for the exact event sequence');
+    console.log('- Look for any events marked with 💥');
+    console.log('- Note the timing between UPLOAD_COMPLETE and any errors');
+    
+    alert(`Test failed: ${error.message}\nCheck console for detailed analysis.`);
+  }
+};
+
+const checkBrowserEnvironment = () => {
+  console.log('🔍 BROWSER ENVIRONMENT CHECK:');
+  console.log('- User Agent:', navigator.userAgent);
+  console.log('- Browser online:', navigator.onLine);
+  console.log('- XMLHttpRequest available:', typeof XMLHttpRequest !== 'undefined');
+  console.log('- Fetch available:', typeof fetch !== 'undefined');
+  console.log('- FormData available:', typeof FormData !== 'undefined');
+  console.log('- Blob available:', typeof Blob !== 'undefined');
+  console.log('- Current URL:', window.location.href);
+  console.log('- API_BASE_URL:', API_BASE_URL);
+  
+  // Check for any JavaScript errors
+  window.addEventListener('error', (event) => {
+    console.error('💥 GLOBAL JS ERROR:', event.error);
+  });
+  
+  window.addEventListener('unhandledrejection', (event) => {
+    console.error('💥 UNHANDLED PROMISE REJECTION:', event.reason);
+  });
+};
+
+// Run all diagnostics
+const runFullDiagnostics = async () => {
+  console.clear();
+  console.log('🚀 RUNNING FULL DIAGNOSTICS...\n');
+  
+  checkBrowserEnvironment();
+  await testDifferentApproaches();
+  
+  console.log('\n📋 DIAGNOSIS COMPLETE - Check the logs above for the exact failure point!');
+};
+// Alternative version with progress tracking using ReadableStream
+const processImageBackgroundWithProgress = async (imageUrl, bgColor, onProgress) => {
+  console.log('🔵 Starting background removal with progress tracking...');
+  
+  try {
+    const imageResponse = await fetch(imageUrl);
+    const originalBlob = await imageResponse.blob();
+    
+    const formData = new FormData();
+    formData.append('image', originalBlob, 'image.jpg');
+    formData.append('bg_color', bgColor);
+
+    const controller = new AbortController();
+    const startTime = Date.now();
+    
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 120000);
+
+    const response = await fetch(`${API_BASE_URL}/remove-background`, {
+      method: 'POST',
+      body: formData,
+      //signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status}`);
+    }
+
+    // Track download progress if possible
+    const contentLength = response.headers.get('content-length');
+    if (contentLength && onProgress) {
+      const total = parseInt(contentLength, 10);
+      let loaded = 0;
+
+      const reader = response.body.getReader();
+      const chunks = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        chunks.push(value);
+        loaded += value.length;
+        
+        const progress = (loaded / total) * 100;
+        onProgress(progress);
+        console.log(`📥 Download progress: ${progress.toFixed(1)}%`);
+      }
+
+      const blob = new Blob(chunks);
+      return URL.createObjectURL(blob);
+    } else {
+      // Fallback to regular blob processing
+      const resultBlob = await response.blob();
+      return URL.createObjectURL(resultBlob);
+    }
+    
+  } catch (error) {
+    console.error('💥 Error:', error.message);
+    return imageUrl;
+  }
+};
+
+// Test function to verify the fix
+const testImageUpload = async () => {
+  console.log('🧪 Testing image upload with Fetch API...');
+  
+  if (csvData.length === 0) {
+    alert('Please upload a CSV with images first');
+    return;
+  }
+  
+  const itemWithImage = csvData.find(item => item[imageColumn]);
+  if (!itemWithImage) {
+    alert('No images found in CSV');
+    return;
+  }
+  
+  console.log('🖼️ Testing with:', itemWithImage[imageColumn]);
+  
+  try {
+    const result = await processImageBackground(itemWithImage[imageColumn], '#ff0000');
+    
+    if (result !== itemWithImage[imageColumn]) {
+      console.log('✅ Upload test SUCCESS! No more early disconnects!');
+      alert('✅ Upload test successful! The Chrome bug is fixed!');
+      
+      // Show the result image
+      const img = document.createElement('img');
+      img.src = result;
+      img.style.maxWidth = '300px';
+      img.style.border = '2px solid green';
+      document.body.appendChild(img);
+      
+    } else {
+      console.log('⚠️ Test returned original image (processing may have failed)');
+      alert('Test completed but processing may have failed. Check console.');
+    }
+  } catch (error) {
+    console.error('❌ Test failed:', error);
+    alert(`Test failed: ${error.message}`);
+  }
+};
+
+// Helper function to compress images
+const compressImage = (blob, quality = 0.8) => {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    
+    img.onload = () => {
+      // Calculate new dimensions (max 1920x1920)
+      const maxSize = 1920;
+      let { width, height } = img;
+      
+      if (width > maxSize || height > maxSize) {
+        const ratio = Math.min(maxSize / width, maxSize / height);
+        width *= ratio;
+        height *= ratio;
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      
+      // Draw and compress
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(resolve, 'image/jpeg', quality);
+    };
+    
+    img.src = URL.createObjectURL(blob);
+  });
+};
+
+// Test function specifically for large images
+const testLargeImageUpload = async () => {
+  console.log('🧪 Testing large image upload...');
+  
+  if (csvData.length === 0) {
+    alert('Please upload a CSV with images first');
+    return;
+  }
+  
+  const itemWithImage = csvData.find(item => item[imageColumn]);
+  if (!itemWithImage) {
+    alert('No images found in CSV');
+    return;
+  }
+  
+  console.log('🖼️ Testing with:', itemWithImage[imageColumn]);
+  
+  try {
+    const result = await processImageBackground(itemWithImage[imageColumn], '#ff0000');
+    
+    if (result !== itemWithImage[imageColumn]) {
+      console.log('✅ Large image test SUCCESS!');
+      alert('Large image test successful! Check console for details.');
+    } else {
+      console.log('⚠️ Large image test returned original (likely failed)');
+      alert('Test completed but may have failed. Check console.');
+    }
+  } catch (error) {
+    console.error('❌ Large image test failed:', error);
+    alert(`Test failed: ${error.message}`);
+  }
+};
+
+ const testBackendConnection = async () => {
+    console.log('🧪 Manual backend connection test...');
+    console.log('🧪 API_BASE_URL:', API_BASE_URL);
+    
+    try {
+      // Test 1: Simple GET to a basic endpoint
+      console.log('Test 1: Testing basic connectivity...');
+      const response1 = await fetch(`${API_BASE_URL}/`, {
+        method: 'GET',
+        mode: 'cors'
+      });
+      console.log('✅ Basic GET result:', response1.status, response1.statusText);
+      
+      // Test 2: OPTIONS (CORS preflight)
+      console.log('Test 2: Testing CORS with OPTIONS...');
+      const response2 = await fetch(`${API_BASE_URL}/remove-background`, { 
+        method: 'OPTIONS',
+        mode: 'cors'
+      });
+      console.log('✅ OPTIONS result:', response2.status, response2.statusText);
+      console.log('✅ CORS headers:', Object.fromEntries(response2.headers.entries()));
+      
+      // Test 3: POST with minimal data
+      console.log('Test 3: Testing POST with minimal data...');
+      const formData = new FormData();
+      formData.append('bg_color', '#ffffff');
+      
+      const response3 = await fetch(`${API_BASE_URL}/remove-background`, { 
+        method: 'POST',
+        body: formData,
+        mode: 'cors'
+      });
+      console.log('✅ POST result:', response3.status, response3.statusText);
+      const text3 = await response3.text();
+      console.log('✅ POST response:', text3.substring(0, 200));
+      
+      console.log('🎉 All connection tests completed successfully');
+      alert('Connection tests completed! Check console for details.');
+      
+    } catch (error) {
+      console.error('❌ Connection test failed:', error);
+      console.error('❌ Error details:', {
+        name: error.name,
+        message: error.message,
+        cause: error.cause
+      });
+      alert(`Connection test failed: ${error.message}`);
+    }
+  };
+
+
+// Alternative: Test with XMLHttpRequest for comparison
+const processImageBackgroundXHR = (imageUrl, bgColor) => {
+  return new Promise(async (resolve, reject) => {
     try {
       const response = await fetch(imageUrl);
-      if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
       const imageBlob = await response.blob();
-
+      
       const formData = new FormData();
       formData.append('image', imageBlob, 'image.png');
       formData.append('bg_color', bgColor);
 
-      const backendResponse = await fetch(`${API_BASE_URL}/remove-background`, {
-        method: 'POST',
-        body: formData,
-      });
+      console.log('🔄 Using XMLHttpRequest instead of fetch...');
+      
+      const xhr = new XMLHttpRequest();
+      
+      xhr.onreadystatechange = () => {
+        console.log('📡 XHR State changed:', xhr.readyState, xhr.status);
+      };
+      
+      xhr.onload = () => {
+        console.log('✅ XHR Load complete');
+        if (xhr.status === 200) {
+          const blob = new Blob([xhr.response], { type: 'image/jpeg' });
+          resolve(URL.createObjectURL(blob));
+        } else {
+          reject(new Error(`XHR Error: ${xhr.status}`));
+        }
+      };
+      
+      xhr.onerror = (error) => {
+        console.error('💥 XHR Error:', error);
+        reject(error);
+      };
+      
+      xhr.ontimeout = () => {
+        console.error('⏰ XHR Timeout');
+        reject(new Error('XHR Timeout'));
+      };
+      
+      xhr.onabort = () => {
+        console.error('🛑 XHR Aborted');
+        reject(new Error('XHR Aborted'));
+      };
 
-      if (!backendResponse.ok) throw new Error(`Backend error: ${backendResponse.statusText}`);
-      const processedBlob = await backendResponse.blob();
-      return URL.createObjectURL(processedBlob);
-    } catch (e) {
-      return imageUrl;
+      xhr.open('POST', `${API_BASE_URL}/remove-background`);
+      xhr.responseType = 'arraybuffer';
+      xhr.timeout = 300000; // 5 minutes
+      xhr.send(formData);
+      
+    } catch (error) {
+      reject(error);
     }
-  };
+  });
+};
+// Test function to verify the process
+const testBackgroundRemoval = async () => {
+  console.log('🧪 Testing background removal...');
+  
+  // You can call this manually to test
+  const testImageUrl = 'path/to/your/test/image.jpg';
+  const result = await processImageBackground(testImageUrl, '#ff0000');
+  
+  console.log('🧪 Test result:', result);
+};
 
   // // All-image processing
   // const processAllImages = async () => {
@@ -496,6 +1025,15 @@ export default function CSVProductUploadForm() {
     );
   }
 
+  const TestButton = () => (
+    <button
+      onClick={testBackendConnection}
+      className="px-4 py-2 bg-yellow-500 text-white rounded-xl hover:bg-yellow-600 transition flex items-center gap-2"
+    >
+      🧪 Test Backend
+    </button>
+  );
+
   return (
     <div className="min-h-screen bg-[#F8F2FC] p-6">
       <div className="max-w-7xl mx-auto">
@@ -588,6 +1126,7 @@ export default function CSVProductUploadForm() {
             >
               <Save className="w-4 h-4" />{isUploading ? `Uploading... ${uploadProgress.toFixed(0)}%` : "Upload All Products"}
             </button>
+            <TestButton />
           </div>
         </div>
 
