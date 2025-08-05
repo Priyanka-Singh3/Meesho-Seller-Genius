@@ -758,261 +758,482 @@ app.get('/health', (req, res) => {
 //   });
 // });
 
-app.post('/remove-background', upload.single('image'), async (req, res) => {
-  // Add 100ms delay at the start of the API call
-  await new Promise((r) => setTimeout(r, 100));
+// app.post('/remove-background', upload.single('image'), async (req, res) => {
+//   // Add 100ms delay at the start of the API call
+//   await new Promise((r) => setTimeout(r, 100));
   
+//   let imageBuffer;
+
+//   // Handle image input
+//   if (req.file) {
+//     imageBuffer = req.file.buffer;
+//     console.log(`Processing uploaded file, size: ${imageBuffer.length} bytes`);
+//   } else if (req.body.image_url) {
+//     try {
+//       console.log(`Downloading image from URL: ${req.body.image_url}`);
+//       const response = await axios.get(req.body.image_url, {
+//         responseType: 'arraybuffer',
+//         timeout: 10000,
+//         maxContentLength: 10 * 1024 * 1024,
+//       });
+//       imageBuffer = Buffer.from(response.data);
+//       console.log(`Downloaded image, size: ${imageBuffer.length} bytes`);
+//     } catch (downloadError) {
+//       console.error(`Failed to download image: ${downloadError.message}`);
+//       return res.status(400).json({
+//         error: 'Failed to download image from URL. Please check the URL is valid and accessible.'
+//       });
+//     }
+//   } else {
+//     return res.status(400).json({
+//       error: 'No image provided. Send either a file upload or image_url in the request body.'
+//     });
+//   }
+
+//   const bgColor = req.body.bg_color || '#ffffff';
+//   const requestId = Date.now();
+
+//   // Validate color format
+//   const colorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+//   if (!colorRegex.test(bgColor)) {
+//     return res.status(400).json({ error: 'Invalid color format. Use hex format like #ffffff' });
+//   }
+
+//   // Check API key
+//   if (!process.env.REMOVEBG_API_KEY) {
+//     return res.status(500).json({
+//       error: 'Remove.bg API key not configured. Please contact administrator to set up the API key.'
+//     });
+//   }
+
+//   console.log(`[${requestId}] Processing background removal with Remove.bg API, color: ${bgColor}`);
+
+//   let pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+//   let responseHandled = false;
+
+//   // Simple response handler - NO streaming, NO heartbeats
+//   const sendFinalResponse = (statusCode, data, logMessage = '') => {
+//     if (responseHandled || res.headersSent) {
+//       console.log(`[${requestId}] Response already sent, ignoring: ${logMessage}`);
+//       return;
+//     }
+    
+//     responseHandled = true;
+    
+//     try {
+//       if (statusCode === 200) {
+//         // Send image directly
+//         res.set({
+//           'Content-Type': 'image/jpeg',
+//           'Content-Length': data.length,
+//           'Cache-Control': 'no-cache'
+//         });
+//         res.send(data);
+//         console.log(`[${requestId}] SUCCESS: Image sent, size: ${data.length} bytes`);
+//       } else {
+//         // Send error
+//         res.status(statusCode).json(data);
+//         console.log(`[${requestId}] ERROR: ${statusCode} - ${logMessage}`);
+//       }
+//     } catch (sendError) {
+//       console.error(`[${requestId}] Failed to send response:`, sendError);
+//     }
+//   };
+
+//   // Track client connection
+//   let clientConnected = true;
+//   let disconnectTime = null;
+  
+//   // Enhanced client disconnection logging with reasons
+//   req.on('close', () => {
+//     const socket = req.socket || req.connection;
+//     let reason = 'Connection closed normally';
+    
+//     if (req.aborted) {
+//       reason = 'Request aborted by client';
+//     } else if (socket && socket.destroyed) {
+//       reason = 'Socket destroyed';
+//     } else if (socket && (!socket.readable || !socket.writable)) {
+//       reason = `Socket not readable/writable (readable: ${socket.readable}, writable: ${socket.writable})`;
+//     }
+    
+//     disconnectTime = Date.now();
+//     const timeSinceStart = disconnectTime - requestId;
+//     console.log(`[${requestId}] Client disconnected - Reason: ${reason} - After: ${timeSinceStart}ms`);
+//     clientConnected = false;
+//   });
+
+//   req.on('aborted', () => {
+//     disconnectTime = Date.now();
+//     const timeSinceStart = disconnectTime - requestId;
+//     console.log(`[${requestId}] Client disconnected - Reason: Request was aborted by client - After: ${timeSinceStart}ms`);
+//     clientConnected = false;
+//   });
+
+//   req.on('error', (err) => {
+//     disconnectTime = Date.now();
+//     const timeSinceStart = disconnectTime - requestId;
+//     console.log(`[${requestId}] Client disconnected - Reason: Request error - ${err.message} - After: ${timeSinceStart}ms`);
+//     clientConnected = false;
+//   });
+
+//   // Spawn Python process
+//   const python = spawn(pythonCmd, [path.join(__dirname, 'python', 'rm_bg.py'), bgColor], {
+//     stdio: ['pipe', 'pipe', 'pipe'],
+//     env: {
+//       ...process.env,
+//       PYTHONUNBUFFERED: '1',
+//     }
+//   });
+
+//   let base64Output = '';
+//   let errorOutput = '';
+//   let processStarted = false;
+
+//   // Handle Python process startup error
+//   python.on('error', (error) => {
+//     console.error(`[${requestId}] Failed to start Python:`, error);
+    
+//     if (error.code === 'ENOENT') {
+//       sendFinalResponse(500, { error: 'Python not found. Please ensure Python is installed.' }, 'python not found');
+//     } else {
+//       sendFinalResponse(500, { error: 'Failed to start background removal process' }, 'startup error');
+//     }
+//   });
+
+//   // Send image data to Python
+//   python.stdin.on('error', (error) => {
+//     if (error.code !== 'EOF' && error.code !== 'EPIPE') {
+//       console.error(`[${requestId}] Stdin error:`, error);
+//       if (!responseHandled) {
+//         sendFinalResponse(500, { error: 'Failed to send image data' }, 'stdin error');
+//       }
+//     }
+//   });
+
+//   try {
+//     python.stdin.write(imageBuffer);
+//     python.stdin.end();
+//     processStarted = true;
+//     console.log(`[${requestId}] Image data sent to Python (${imageBuffer.length} bytes)`);
+//   } catch (writeError) {
+//     console.error(`[${requestId}] Failed to write to Python stdin:`, writeError);
+//     sendFinalResponse(500, { error: 'Failed to send image data' }, 'write error');
+//     return;
+//   }
+
+//   // Collect Python output
+//   python.stdout.on('data', (data) => {
+//     base64Output += data.toString();
+//   });
+
+//   python.stderr.on('data', (data) => {
+//     const logMsg = data.toString().trim();
+//     if (logMsg) {
+//       console.log(`[${requestId}] Python: ${logMsg}`);
+//       errorOutput += data.toString();
+//     }
+//   });
+
+//   // Handle Python process completion
+//   python.on('close', (code) => {
+//     console.log(`[${requestId}] Python process finished with code: ${code}`);
+
+//     // Check if client disconnected and when
+//     if (!clientConnected) {
+//       const timeSinceDisconnect = disconnectTime ? Date.now() - disconnectTime : 0;
+//       console.log(`[${requestId}] Client disconnected ${timeSinceDisconnect}ms ago, but process completed successfully`);
+      
+//       // If client disconnected very early (less than 5 seconds), it might be a premature timeout
+//       // Log this as a potential issue that should be investigated
+//       if (disconnectTime && (disconnectTime - requestId) < 5000) {
+//         console.warn(`[${requestId}] WARNING: Client disconnected very early (${disconnectTime - requestId}ms after start). Possible premature timeout!`);
+//       }
+      
+//       console.log(`[${requestId}] Not sending response due to client disconnection`);
+//       return;
+//     }
+
+//     if (code !== 0) {
+//       console.error(`[${requestId}] Python failed with code ${code}`);
+//       console.error(`[${requestId}] Error output:`, errorOutput);
+
+//       // Parse specific errors
+//       if (errorOutput.includes('Remove.bg API key not configured')) {
+//         sendFinalResponse(500, { error: 'Remove.bg API key not configured' }, 'no API key');
+//       } else if (errorOutput.includes('Remove.bg API error')) {
+//         const match = errorOutput.match(/Remove\.bg API error: ([^\n]+)/);
+//         const apiError = match ? match[1] : 'API request failed';
+//         sendFinalResponse(400, { error: `Remove.bg API error: ${apiError}` }, 'API error');
+//       } else if (errorOutput.includes('Invalid image format')) {
+//         sendFinalResponse(400, { error: 'Invalid image format' }, 'invalid image');
+//       } else {
+//         sendFinalResponse(500, { error: 'Background removal failed' }, 'processing failed');
+//       }
+//       return;
+//     }
+
+//     // Success - process base64 output
+//     try {
+//       const cleanBase64 = base64Output.trim();
+//       if (!cleanBase64) {
+//         throw new Error('No output received');
+//       }
+
+//       const imageBuffer = Buffer.from(cleanBase64, 'base64');
+//       console.log(`[${requestId}] Decoded image: ${imageBuffer.length} bytes`);
+      
+//       sendFinalResponse(200, imageBuffer, 'success');
+
+//     } catch (decodeError) {
+//       console.error(`[${requestId}] Failed to decode output:`, decodeError);
+//       console.error(`[${requestId}] Base64 length: ${base64Output.length}`);
+//       sendFinalResponse(500, { error: 'Failed to process image output' }, 'decode error');
+//     }
+//   });
+
+//   // Set timeout for the entire process
+//   const timeoutHandle = setTimeout(() => {
+//     if (!responseHandled) {
+//       console.log(`[${requestId}] Process timeout`);
+      
+//       try {
+//         python.kill('SIGTERM');
+//         setTimeout(() => python.kill('SIGKILL'), 3000);
+//       } catch (killError) {
+//         console.error(`[${requestId}] Error killing process:`, killError);
+//       }
+      
+//       sendFinalResponse(500, { error: 'Processing timeout' }, 'timeout');
+//     }
+//   }, 120000); // 2 minutes
+
+//   // Clear timeout when process completes
+//   python.on('close', () => {
+//     clearTimeout(timeoutHandle);
+//   });
+// });
+
+app.post("/remove-background", upload.single("image"), async (req, res) => {
+  const requestId = () => new Date().now();
+  let clientConnected = true;
+  let disconnectTime = null;
+
+  // Enhanced client disconnection logging with reasons
+  req.on("end", () => {
+    console.log(`[${new Date().toISOString()}] ✓ request body fully received`);
+  });
+
+  req.on("aborted", () => {
+    disconnectTime = Date.now();
+    const timeSinceStart = disconnectTime - requestId();
+    console.log(
+      `[${requestId()}] Client disconnected - Reason: Request was aborted by client - After: ${timeSinceStart}ms`
+    );
+    clientConnected = false;
+  });
+
+  req.on("error", (err) => {
+    disconnectTime = Date.now();
+    const timeSinceStart = disconnectTime - requestId();
+    console.log(
+      `[${requestId()}] Client disconnected - Reason: Request error - ${
+        err.message
+      } - After: ${timeSinceStart}ms`
+    );
+    clientConnected = false;
+  });
   let imageBuffer;
 
-  // Handle image input
   if (req.file) {
     imageBuffer = req.file.buffer;
-    console.log(`Processing uploaded file, size: ${imageBuffer.length} bytes`);
   } else if (req.body.image_url) {
     try {
-      console.log(`Downloading image from URL: ${req.body.image_url}`);
       const response = await axios.get(req.body.image_url, {
-        responseType: 'arraybuffer',
+        responseType: "arraybuffer",
         timeout: 10000,
         maxContentLength: 10 * 1024 * 1024,
       });
       imageBuffer = Buffer.from(response.data);
-      console.log(`Downloaded image, size: ${imageBuffer.length} bytes`);
+      console.log(imageBuffer);
     } catch (downloadError) {
-      console.error(`Failed to download image: ${downloadError.message}`);
       return res.status(400).json({
-        error: 'Failed to download image from URL. Please check the URL is valid and accessible.'
+        error:
+          "Failed to download image from URL. Please check the URL is valid and accessible.",
       });
     }
   } else {
     return res.status(400).json({
-      error: 'No image provided. Send either a file upload or image_url in the request body.'
+      error:
+        "No image provided. Send either a file upload or image_url in the request body.",
     });
   }
 
-  const bgColor = req.body.bg_color || '#ffffff';
-  const requestId = Date.now();
+  const bgColor = req.body.bg_color || "#ffffff";
 
   // Validate color format
   const colorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
   if (!colorRegex.test(bgColor)) {
-    return res.status(400).json({ error: 'Invalid color format. Use hex format like #ffffff' });
+    return res
+      .status(400)
+      .json({ error: "Invalid color format. Use hex format like #ffffff" });
   }
 
   // Check API key
+
   if (!process.env.REMOVEBG_API_KEY) {
     return res.status(500).json({
-      error: 'Remove.bg API key not configured. Please contact administrator to set up the API key.'
+      error:
+        "Remove.bg API key not configured. Please contact administrator to set up the API key.",
     });
   }
 
-  console.log(`[${requestId}] Processing background removal with Remove.bg API, color: ${bgColor}`);
+  let pythonCmd = process.platform === "win32" ? "python" : "python3";
 
-  let pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-  let responseHandled = false;
+  // Wrap the Python process in an awaitable Promise for better lifecycle management
+  const pythonProcess = () =>
+    new Promise((resolve, reject) => {
+      const python = spawn(
+        pythonCmd,
+        [path.join(__dirname, "python", "rm_bg.py"), bgColor],
+        {
+          stdio: ["pipe", "pipe", "pipe"],
+          env: {
+            ...process.env,
+            PYTHONUNBUFFERED: "1",
+          },
+        }
+      );
 
-  // Simple response handler - NO streaming, NO heartbeats
-  const sendFinalResponse = (statusCode, data, logMessage = '') => {
-    if (responseHandled || res.headersSent) {
-      console.log(`[${requestId}] Response already sent, ignoring: ${logMessage}`);
-      return;
-    }
-    
-    responseHandled = true;
-    
-    try {
-      if (statusCode === 200) {
-        // Send image directly
-        res.set({
-          'Content-Type': 'image/jpeg',
-          'Content-Length': data.length,
-          'Cache-Control': 'no-cache'
-        });
-        res.send(data);
-        console.log(`[${requestId}] SUCCESS: Image sent, size: ${data.length} bytes`);
-      } else {
-        // Send error
-        res.status(statusCode).json(data);
-        console.log(`[${requestId}] ERROR: ${statusCode} - ${logMessage}`);
+      let base64Output = "";
+      let errorOutput = "";
+
+      // Collect output
+      python.stdout.on("data", (data) => {
+        base64Output += data.toString();
+      });
+
+      python.stderr.on("data", (data) => {
+        errorOutput += data.toString();
+      });
+
+      // Handle process errors
+      python.on("error", (error) => {
+        reject(error);
+      });
+
+      // Handle stdin errors
+      python.stdin.on("error", (error) => {
+        if (error.code !== "EOF" && error.code !== "EPIPE") {
+          reject(error);
+        }
+      });
+
+      // Handle process close
+      python.on("close", (code) => {
+        resolve({ code, base64Output, errorOutput });
+      });
+
+      // Send image data to Python
+      try {
+        python.stdin.write(imageBuffer);
+        python.stdin.end();
+      } catch (writeError) {
+        reject(writeError);
       }
-    } catch (sendError) {
-      console.error(`[${requestId}] Failed to send response:`, sendError);
-    }
-  };
 
-  // Track client connection
-  let clientConnected = true;
-  let disconnectTime = null;
-  
-  // Enhanced client disconnection logging with reasons
-  req.on('close', () => {
-    const socket = req.socket || req.connection;
-    let reason = 'Connection closed normally';
-    
-    if (req.aborted) {
-      reason = 'Request aborted by client';
-    } else if (socket && socket.destroyed) {
-      reason = 'Socket destroyed';
-    } else if (socket && (!socket.readable || !socket.writable)) {
-      reason = `Socket not readable/writable (readable: ${socket.readable}, writable: ${socket.writable})`;
-    }
-    
-    disconnectTime = Date.now();
-    const timeSinceStart = disconnectTime - requestId;
-    console.log(`[${requestId}] Client disconnected - Reason: ${reason} - After: ${timeSinceStart}ms`);
-    clientConnected = false;
-  });
+      // Kill Python process if client disconnects before response is sent
+      // const disconnectionListener = () => {
+      //   python.kill("SIGTERM");
+      //   setTimeout(() => python.kill("SIGKILL"), 3000);
+      // };
+      // req.on("close", disconnectionListener);
+      // req.on("aborted", disconnectionListener);
+      // req.on("error", disconnectionListener);
 
-  req.on('aborted', () => {
-    disconnectTime = Date.now();
-    const timeSinceStart = disconnectTime - requestId;
-    console.log(`[${requestId}] Client disconnected - Reason: Request was aborted by client - After: ${timeSinceStart}ms`);
-    clientConnected = false;
-  });
-
-  req.on('error', (err) => {
-    disconnectTime = Date.now();
-    const timeSinceStart = disconnectTime - requestId;
-    console.log(`[${requestId}] Client disconnected - Reason: Request error - ${err.message} - After: ${timeSinceStart}ms`);
-    clientConnected = false;
-  });
-
-  // Spawn Python process
-  const python = spawn(pythonCmd, [path.join(__dirname, 'python', 'rm_bg.py'), bgColor], {
-    stdio: ['pipe', 'pipe', 'pipe'],
-    env: {
-      ...process.env,
-      PYTHONUNBUFFERED: '1',
-    }
-  });
-
-  let base64Output = '';
-  let errorOutput = '';
-  let processStarted = false;
-
-  // Handle Python process startup error
-  python.on('error', (error) => {
-    console.error(`[${requestId}] Failed to start Python:`, error);
-    
-    if (error.code === 'ENOENT') {
-      sendFinalResponse(500, { error: 'Python not found. Please ensure Python is installed.' }, 'python not found');
-    } else {
-      sendFinalResponse(500, { error: 'Failed to start background removal process' }, 'startup error');
-    }
-  });
-
-  // Send image data to Python
-  python.stdin.on('error', (error) => {
-    if (error.code !== 'EOF' && error.code !== 'EPIPE') {
-      console.error(`[${requestId}] Stdin error:`, error);
-      if (!responseHandled) {
-        sendFinalResponse(500, { error: 'Failed to send image data' }, 'stdin error');
-      }
-    }
-  });
+      // // Cleanup listeners when process closes
+      // python.on("close", () => {
+      //   req.removeListener("close", disconnectionListener);
+      //   req.removeListener("aborted", disconnectionListener);
+      //   req.removeListener("error", disconnectionListener);
+      // });
+    });
 
   try {
-    python.stdin.write(imageBuffer);
-    python.stdin.end();
-    processStarted = true;
-    console.log(`[${requestId}] Image data sent to Python (${imageBuffer.length} bytes)`);
-  } catch (writeError) {
-    console.error(`[${requestId}] Failed to write to Python stdin:`, writeError);
-    sendFinalResponse(500, { error: 'Failed to send image data' }, 'write error');
-    return;
-  }
-
-  // Collect Python output
-  python.stdout.on('data', (data) => {
-    base64Output += data.toString();
-  });
-
-  python.stderr.on('data', (data) => {
-    const logMsg = data.toString().trim();
-    if (logMsg) {
-      console.log(`[${requestId}] Python: ${logMsg}`);
-      errorOutput += data.toString();
-    }
-  });
-
-  // Handle Python process completion
-  python.on('close', (code) => {
-    console.log(`[${requestId}] Python process finished with code: ${code}`);
-
-    // Check if client disconnected and when
-    if (!clientConnected) {
-      const timeSinceDisconnect = disconnectTime ? Date.now() - disconnectTime : 0;
-      console.log(`[${requestId}] Client disconnected ${timeSinceDisconnect}ms ago, but process completed successfully`);
-      
-      // If client disconnected very early (less than 5 seconds), it might be a premature timeout
-      // Log this as a potential issue that should be investigated
-      if (disconnectTime && (disconnectTime - requestId) < 5000) {
-        console.warn(`[${requestId}] WARNING: Client disconnected very early (${disconnectTime - requestId}ms after start). Possible premature timeout!`);
-      }
-      
-      console.log(`[${requestId}] Not sending response due to client disconnection`);
-      return;
-    }
+    console.log("starting the python process.");
+    const { code, base64Output, errorOutput } = await pythonProcess();
+    console.log(
+      "DONE WITH THE python process.",
+      code,
+      base64Output.length,
+      errorOutput
+    );
 
     if (code !== 0) {
-      console.error(`[${requestId}] Python failed with code ${code}`);
-      console.error(`[${requestId}] Error output:`, errorOutput);
-
-      // Parse specific errors
-      if (errorOutput.includes('Remove.bg API key not configured')) {
-        sendFinalResponse(500, { error: 'Remove.bg API key not configured' }, 'no API key');
-      } else if (errorOutput.includes('Remove.bg API error')) {
+      // Parse specific errors from errorOutput
+      if (errorOutput.includes("Remove.bg API key not configured")) {
+        return res
+          .status(500)
+          .json({ error: "Remove.bg API key not configured" });
+      } else if (errorOutput.includes("Remove.bg API error")) {
         const match = errorOutput.match(/Remove\.bg API error: ([^\n]+)/);
-        const apiError = match ? match[1] : 'API request failed';
-        sendFinalResponse(400, { error: `Remove.bg API error: ${apiError}` }, 'API error');
-      } else if (errorOutput.includes('Invalid image format')) {
-        sendFinalResponse(400, { error: 'Invalid image format' }, 'invalid image');
+        const apiError = match ? match[1] : "API request failed";
+        return res
+          .status(400)
+          .json({ error: `Remove.bg API error: ${apiError}` });
+      } else if (errorOutput.includes("Invalid image format")) {
+        return res.status(400).json({ error: "Invalid image format" });
       } else {
-        sendFinalResponse(500, { error: 'Background removal failed' }, 'processing failed');
+        return res.status(500).json({ error: "Background removal failed" });
       }
-      return;
     }
 
     // Success - process base64 output
-    try {
-      const cleanBase64 = base64Output.trim();
-      if (!cleanBase64) {
-        throw new Error('No output received');
-      }
-
-      const imageBuffer = Buffer.from(cleanBase64, 'base64');
-      console.log(`[${requestId}] Decoded image: ${imageBuffer.length} bytes`);
-      
-      sendFinalResponse(200, imageBuffer, 'success');
-
-    } catch (decodeError) {
-      console.error(`[${requestId}] Failed to decode output:`, decodeError);
-      console.error(`[${requestId}] Base64 length: ${base64Output.length}`);
-      sendFinalResponse(500, { error: 'Failed to process image output' }, 'decode error');
+    const cleanBase64 = base64Output.trim();
+    if (!cleanBase64) {
+      throw new Error("No output received");
     }
-  });
-
-  // Set timeout for the entire process
-  const timeoutHandle = setTimeout(() => {
-    if (!responseHandled) {
-      console.log(`[${requestId}] Process timeout`);
-      
-      try {
-        python.kill('SIGTERM');
-        setTimeout(() => python.kill('SIGKILL'), 3000);
-      } catch (killError) {
-        console.error(`[${requestId}] Error killing process:`, killError);
-      }
-      
-      sendFinalResponse(500, { error: 'Processing timeout' }, 'timeout');
+    const processedImageBuffer = Buffer.from(cleanBase64, "base64");
+    if (!clientConnected || res.writableEnded || res.socket.destroyed) {
+      console.log(
+        `[${new Date().toISOString()}] skipping res.send(): client gone`
+      );
+      return;
     }
-  }, 120000); // 2 minutes
-
-  // Clear timeout when process completes
-  python.on('close', () => {
-    clearTimeout(timeoutHandle);
-  });
+    res.set({
+      "Content-Type": "image/jpeg",
+      "Content-Length": processedImageBuffer.length,
+      "Cache-Control": "no-cache",
+    });
+    res.send(processedImageBuffer);
+  } catch (error) {
+    if (error.message === "Timeout") {
+      return res.status(500).json({ error: "Processing timeout" });
+    } else if (error.code === "ENOENT") {
+      return res.status(500).json({
+        error: "Python not found. Please ensure Python is installed.",
+      });
+    } else if (
+      error.message.includes("Failed to send image data") ||
+      error.message.includes("Failed to write to Python stdin")
+    ) {
+      return res.status(500).json({ error: "Failed to send image data" });
+    } else if (error.message.includes("Failed to start Python")) {
+      return res
+        .status(500)
+        .json({ error: "Failed to start background removal process" });
+    } else if (error.message.includes("Failed to decode output")) {
+      return res.status(500).json({ error: "Failed to process image output" });
+    } else {
+      return res
+        .status(500)
+        .json({ error: "An unexpected error occurred during processing" });
+    }
+  }
+  console.log("COMPLETED THE python process.");
 });
+
+
 // Health check endpoint
 app.get('/health/rembg', (req, res) => {
   let pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
