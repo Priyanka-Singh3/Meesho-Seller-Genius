@@ -12,17 +12,25 @@ require('dotenv').config();
 const HF_API_KEY = process.env.HF_API_KEY;
 const REMOVEBG_API_KEY=  process.env.REMOVEBG_API_KEY;
 
-// CORS configuration - Allow all origins
-const corsOptions = {
-  origin: true, // This allows all origins
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: '*'
-};
-
 const app = express();
 
-app.use(cors(corsOptions));
+// CORS configuration - Allow all origins
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://meesho1-one.vercel.app'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  optionsSuccessStatus: 200
+}));
+
+
+
+
+//app.use(cors(corsOptions));
 // app.use(express.json());
 
 app.use(express.json({limit: '50mb'}));
@@ -1019,7 +1027,7 @@ app.post("/remove-background", upload.single("image"), async (req, res) => {
   let clientConnected = true;
   let disconnectTime = null;
 
-  // Enhanced client disconnection logging with reasons
+  // "end" event is triggered when all the data from the request body has been received.
   req.on("end", () => {
     console.log(`[${new Date().toISOString()}] ✓ request body fully received`);
   });
@@ -1097,6 +1105,8 @@ app.post("/remove-background", upload.single("image"), async (req, res) => {
         pythonCmd,
         [path.join(__dirname, "python", "rm_bg.py"), bgColor],
         {
+          //This tells Node.js how to handle the input/output of the Python process.
+          //"pipe" means Node will connect to the child's stdin, stdout, and stderr so you can:
           stdio: ["pipe", "pipe", "pipe"],
           env: {
             ...process.env,

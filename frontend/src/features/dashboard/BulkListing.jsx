@@ -1025,14 +1025,14 @@ const testBackgroundRemoval = async () => {
     );
   }
 
-  const TestButton = () => (
+  /*const TestButton = () => (
     <button
       onClick={testBackendConnection}
       className="px-4 py-2 bg-yellow-500 text-white rounded-xl hover:bg-yellow-600 transition flex items-center gap-2"
     >
       🧪 Test Backend
     </button>
-  );
+  );*/
 
   return (
     <div className="min-h-screen bg-[#F8F2FC] p-6">
@@ -1110,14 +1110,14 @@ const testBackgroundRemoval = async () => {
               disabled={isProcessingImages || !imageColumn}
               className={`px-6 py-3 rounded-xl transition flex items-center gap-2 ${isProcessingImages || !imageColumn ? "bg-gray-400 cursor-not-allowed" : "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:shadow-lg"}`}
             >
-              <Palette className="w-4 h-4" />{isProcessingImages ? `Processing... ${processingProgress.toFixed(0)}%` : "Process All Images"}
+              <Palette className="w-4 h-4" />{isProcessingImages ? `Processing... ` : "Process All Images"}
             </button>
             <button
               onClick={generateCopyForAll}
               disabled={isGeneratingCopy}
               className={`px-6 py-3 rounded-xl transition flex items-center gap-2 ${isGeneratingCopy ? "bg-gray-400 cursor-not-allowed" : "bg-gradient-to-r from-[#9B177E] to-[#F43F5E] text-white hover:shadow-lg"}`}
             >
-              <Wand2 className="w-4 h-4" />{isGeneratingCopy ? `Generating... ${copyProgress.toFixed(0)}%` : "Generate Copy for All"}
+              <Wand2 className="w-4 h-4" />{isGeneratingCopy ? `Generating... ` : "Generate Copy for All"}
             </button>
             <button
               onClick={uploadAllProducts}
@@ -1126,7 +1126,7 @@ const testBackgroundRemoval = async () => {
             >
               <Save className="w-4 h-4" />{isUploading ? `Uploading... ${uploadProgress.toFixed(0)}%` : "Upload All Products"}
             </button>
-            <TestButton />
+           
           </div>
         </div>
 
