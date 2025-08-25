@@ -2,6 +2,9 @@
 
 An AI-powered seller platform inspired by Meesho, built as a group project. Empowers local sellers to generate, refine, and translate product content, manage bulk listings, and optimize pricing with a modern, user-friendly interface.
 
+https://meesho1-one.vercel.app/
+
+
 ---
 
 ## 🚀 Features
